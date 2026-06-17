@@ -1,0 +1,13 @@
+model_list:
+  - model_name: default
+    litellm_params:
+      model: ollama/llama3.2
+      api_base: http://host.docker.internal:11434
+
+  - model_name: bedrock-claude
+    litellm_params:
+      model: bedrock/anthropic.claude-3-5-haiku-20241022-v1:0
+      aws_region_name: us-east-1
+
+general_settings:
+  master_key: "streamvault-local-dev-key"

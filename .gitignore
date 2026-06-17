@@ -1,24 +1,102 @@
-# Compiled class file
+# =============================================================================
+# SECRETS & ENVIRONMENT — never commit real values
+# =============================================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+
+# =============================================================================
+# AWS
+# =============================================================================
+.aws/
+aws-exports.js
+
+# =============================================================================
+# JAVA / SPRING BOOT
+# =============================================================================
+target/
 *.class
-
-# Log file
-*.log
-
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
 *.jar
 *.war
-*.nar
 *.ear
-*.zip
-*.tar.gz
-*.rar
-
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+*.nar
 hs_err_pid*
 replay_pid*
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
+
+# Spring Boot local config overrides (keep these out — use .env instead)
+src/main/resources/application-local.yml
+src/main/resources/application-local.properties
+src/main/resources/application-dev.yml
+src/main/resources/application-dev.properties
+
+# =============================================================================
+# NEXT.JS / NODE
+# =============================================================================
+node_modules/
+.next/
+out/
+.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.vercel
+
+# =============================================================================
+# DOCKER
+# =============================================================================
+# Don't ignore docker-compose files — those are committed
+# But ignore any local override files
+docker-compose.override.yml
+
+# =============================================================================
+# INTELLIJ IDEA
+# =============================================================================
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# =============================================================================
+# VS CODE
+# =============================================================================
+.vscode/
+!.vscode/extensions.json
+
+# =============================================================================
+# OPERATING SYSTEM
+# =============================================================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# =============================================================================
+# LOGS & RUNTIME
+# =============================================================================
+logs/
+*.log
+*.log.*
+pid/
+*.pid
+
+# =============================================================================
+# OPENSPEC — commit specs, not working state lock files
+# =============================================================================
+.openspec/.lock
+

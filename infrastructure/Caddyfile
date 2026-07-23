@@ -1,0 +1,15 @@
+# infrastructure/Caddyfile
+# Caddy reverse proxy configuration for StreamVault EC2
+#
+# Replace YOUR_DOMAIN with your actual domain name when DNS is configured.
+# Until a domain is set up, comment out the domain block and use the IP block below.
+#
+# With domain (uncomment when DNS is ready):
+# YOUR_DOMAIN {
+#     reverse_proxy streamvault-app:8080
+# }
+#
+# Without domain (IP only, no HTTPS):
+:80 {
+    respond "StreamVault is up. Configure a domain to enable HTTPS." 200
+}

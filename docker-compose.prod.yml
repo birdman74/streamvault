@@ -1,0 +1,41 @@
+# docker-compose.prod.yml (EC2 / production)
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# LiteLLM is intentionally excluded from this file.
+# The t3.micro (1GB RAM) cannot run LiteLLM alongside Spring Boot without instability.
+# LiteLLM will be added back when upgrading to a larger instance for production demo.
+# For local development, use docker-compose.yml which includes LiteLLM routing to Ollama.
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: streamvault-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: streamvault-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:

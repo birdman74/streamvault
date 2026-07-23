@@ -34,11 +34,11 @@ Completing EC2 and local dev environment setup before handing off to PO/Dev/Test
 - [x] Docker installed on EC2 (v29.6.2)
 - [x] Docker Compose installed on EC2 (v5.3.1)
 - [x] AWS Budget alarm configured
-- [ ] Swap file added to EC2 (OOM crash prevention)
-- [ ] `restart: unless-stopped` added to all compose services
-- [ ] PostgreSQL container stable on EC2
-- [ ] LiteLLM container stable on EC2
-- [ ] Caddy reverse proxy added to compose (HTTPS termination)
+- [x] Swap file added to EC2 (OOM crash prevention)
+- [x] `restart: unless-stopped` added to all compose services
+- [x] PostgreSQL container stable on EC2
+- [x] LiteLLM container deferred from EC2 (t3.micro memory constraint - will revisit when upgrading instance for production demo)
+- [x] Caddy reverse proxy added to compose (HTTPS termination)
 - [ ] Domain name pointed at Elastic IP
 
 ### Local Dev Environment
@@ -119,7 +119,7 @@ _None yet. Infrastructure stabilization must complete before PO workflow begins.
 
 ## Blocked Items
 
-_None currently. Next action: fix EC2 OOM issue (swap file)._
+_None currently. Next action: install Ollama locally and configure MongoDB Atlas._
 
 ---
 

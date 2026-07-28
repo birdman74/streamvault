@@ -2,26 +2,26 @@
 
 > This file is the source of truth for project health and progress.
 > Updated by Brian (infrastructure/review), PO persona (epics/stories), Dev persona (implementation), and Test persona (verification).
+> **Updated as part of every meaningful commit — do not let this file fall behind.**
 
 ---
 
 ## Health Indicator
 
-**Current Status: 🟡 YELLOW**
-_Infrastructure stabilization in progress. No application commits yet._
+### Rules
+To compute current health, use `Last Updated` date and `Blocked Items` section below:
 
-| Threshold | Meaning |
+| Status | Condition |
 |---|---|
-| 🟢 Green | Commit to main in the last 3 days |
-| 🟡 Yellow | No commit in 4-7 days, or infrastructure blocked |
-| 🔴 Red | No commit in 7+ days, or blocked with no plan to unblock |
+| 🟢 Green | Last Updated within 3 days AND no blocked items |
+| 🟡 Yellow | Last Updated 4-7 days ago OR any blocked items with a plan to unblock |
+| 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
----
+### Last Updated
+2026-07-23
 
-## Current Focus
-
-**Phase: Infrastructure Stabilization**
-Completing EC2 and local dev environment setup before handing off to PO/Dev/Test workflow.
+### Current Phase
+Infrastructure Stabilization — completing local dev environment before PO/Dev/Test workflow begins.
 
 ---
 
@@ -34,11 +34,12 @@ Completing EC2 and local dev environment setup before handing off to PO/Dev/Test
 - [x] Docker installed on EC2 (v29.6.2)
 - [x] Docker Compose installed on EC2 (v5.3.1)
 - [x] AWS Budget alarm configured
-- [x] Swap file added to EC2 (OOM crash prevention)
+- [x] Swap file added to EC2 (2GB, persistent via /etc/fstab)
 - [x] `restart: unless-stopped` added to all compose services
 - [x] PostgreSQL container stable on EC2
-- [x] LiteLLM container deferred from EC2 (t3.micro memory constraint - will revisit when upgrading instance for production demo)
-- [x] Caddy reverse proxy added to compose (HTTPS termination)
+- [x] LiteLLM deferred from EC2 (t3.micro memory constraint — revisit when upgrading instance for production demo)
+- [x] Caddy reverse proxy added to compose and responding on port 80/443
+- [x] Split docker-compose.yml (local dev) and docker-compose.prod.yml (EC2)
 - [ ] Domain name pointed at Elastic IP
 
 ### Local Dev Environment
@@ -78,6 +79,12 @@ _None yet. Infrastructure stabilization must complete before PO workflow begins.
 
 ---
 
+## Blocked Items
+
+_None. Next actions: Ollama local setup, MongoDB Atlas, then hand off to PO._
+
+---
+
 ## Stack Reference
 
 | Layer | Technology |
@@ -92,6 +99,8 @@ _None yet. Infrastructure stabilization must complete before PO workflow begins.
 | Infrastructure | AWS EC2 t3.micro, Docker, Docker Compose, Caddy |
 | Networking | Tailscale |
 | Spec Tooling | OpenSpec, OpenCode |
+
+---
 
 ## Key References
 
@@ -111,16 +120,7 @@ _None yet. Infrastructure stabilization must complete before PO workflow begins.
 |---|---|
 | Dual-store (PostgreSQL + MongoDB) | PostgreSQL for structured relational data (users, watch history); MongoDB for flexible media metadata where schema varies significantly (home movies vs TMDB entries) |
 | LiteLLM as AI gateway | Provider-agnostic routing so application code never changes when switching between Ollama (free local dev) and AWS Bedrock (production demos) |
+| LiteLLM deferred from EC2 | t3.micro has 1GB RAM; LiteLLM consumed ~500MB leaving insufficient headroom for Spring Boot. Will revisit on instance upgrade. |
 | Spring AI over direct SDK | First-class Java abstraction for AI that enterprise Java shops are adopting; demonstrates modern Java AI integration patterns |
 | Single Claude Code image, three personas | Tooling needs are identical across personas; behavior is driven entirely by CLAUDE.md system prompts |
 | All Rights Reserved license | Portfolio repo must be publicly visible for recruiters while protecting original work |
-
----
-
-## Blocked Items
-
-_None currently. Next action: install Ollama locally and configure MongoDB Atlas._
-
----
-
-_Last updated: 2026-07-23_

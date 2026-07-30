@@ -45,8 +45,8 @@ Infrastructure Stabilization — completing local dev environment before PO/Dev/
 ### Local Dev Environment
 - [x] Ollama deferred — AMD RX 7600 XT lacks DirectML support in Ollama Docker image on WSL2/Windows; CPU-only inference not performant enough to justify inclusion. Will revisit if Claude Pro API costs become a concern during development.
 - [x] Local LiteLLM deferred alongside Ollama — will revisit when Ollama is unblocked or an alternative local inference path is identified.
-- [ ] MongoDB Atlas M0 free tier created
-- [ ] MongoDB Atlas connection string added to .env (local + EC2)
+- [x] MongoDB Atlas M0 free tier created
+- [x] MongoDB Atlas connection string added to .env (local + EC2)
 
 ### CI/CD
 - [ ] GitHub Actions workflow: build on push to main

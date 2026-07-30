@@ -18,7 +18,7 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-07-23
+2026-07-30
 
 ### Current Phase
 Infrastructure Stabilization — completing local dev environment before PO/Dev/Test workflow begins.
@@ -43,8 +43,8 @@ Infrastructure Stabilization — completing local dev environment before PO/Dev/
 - [ ] Domain name pointed at Elastic IP
 
 ### Local Dev Environment
-- [ ] Ollama installed and running locally (WSL2)
-- [ ] Local LiteLLM compose verified routing to Ollama
+- [x] Ollama deferred — AMD RX 7600 XT lacks DirectML support in Ollama Docker image on WSL2/Windows; CPU-only inference not performant enough to justify inclusion. Will revisit if Claude Pro API costs become a concern during development.
+- [x] Local LiteLLM deferred alongside Ollama — will revisit when Ollama is unblocked or an alternative local inference path is identified.
 - [ ] MongoDB Atlas M0 free tier created
 - [ ] MongoDB Atlas connection string added to .env (local + EC2)
 
@@ -124,3 +124,4 @@ _None. Next actions: Ollama local setup, MongoDB Atlas, then hand off to PO._
 | Spring AI over direct SDK | First-class Java abstraction for AI that enterprise Java shops are adopting; demonstrates modern Java AI integration patterns |
 | Single Claude Code image, three personas | Tooling needs are identical across personas; behavior is driven entirely by CLAUDE.md system prompts |
 | All Rights Reserved license | Portfolio repo must be publicly visible for recruiters while protecting original work |
+| Ollama deferred (local) | AMD RX 7600 XT GPU passthrough to Docker on WSL2/Windows uses DirectML which Ollama does not support. CPU-only inference is too slow for practical use. LiteLLM will route to Claude API during development and AWS Bedrock for production demos. Will revisit if Claude Pro quota or API costs become a concern. |

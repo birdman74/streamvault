@@ -18,10 +18,10 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-07-30
+2026-08-11
 
 ### Current Phase
-Infrastructure Stabilization — completing local dev environment before PO/Dev/Test workflow begins.
+Application Development — User Authentication epic drafted by PO, pending Brian's review before Dev picks it up.
 
 ---
 
@@ -64,7 +64,7 @@ Infrastructure Stabilization — completing local dev environment before PO/Dev/
 
 ## Application Milestones
 
-- [ ] First epic defined by PO (user authentication)
+- [x] First epic defined by PO (user authentication)
 - [ ] First story implemented by Dev
 - [ ] First story verified by Test
 - [ ] First AI-powered feature end-to-end (LiteLLM + Ollama)
@@ -75,13 +75,19 @@ Infrastructure Stabilization — completing local dev environment before PO/Dev/
 
 ## Epics & Stories
 
-_None yet. Infrastructure stabilization must complete before PO workflow begins._
+### Epic: User Authentication
+Spec: `docs/specs/epic-user-authentication.md` — READY FOR REVIEW
+
+- [ ] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`)
+- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`)
+
+Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, Google/email account linking.
 
 ---
 
 ## Blocked Items
 
-_None. Next actions: Ollama local setup, MongoDB Atlas, then hand off to PO._
+- Open decisions needed from Brian before Dev picks up STORY-001/STORY-002: (1) logout semantics under stateless JWT — client-side discard only, or server-side revocation; (2) minimum password complexity threshold; (3) account-linking behavior when a Google sign-in email matches an existing email/password account. See Notes sections in the story specs.
 
 ---
 

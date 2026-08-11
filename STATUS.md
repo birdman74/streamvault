@@ -21,7 +21,7 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 2026-08-11
 
 ### Current Phase
-Application Development — User Authentication epic drafted by PO, pending Brian's review before Dev picks it up.
+Application Development — Dev persona bootstrapping the Spring Boot backend project skeleton on `feature/STORY-001-email-password-auth` ahead of implementing STORY-001 acceptance criteria.
 
 ---
 

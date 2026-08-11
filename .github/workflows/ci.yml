@@ -1,0 +1,105 @@
+name: StreamVault CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    name: Validate Repository Structure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify required files exist
+        run: |
+          echo "Checking required project files..."
+          test -f STATUS.md && echo "✅ STATUS.md" || (echo "❌ STATUS.md missing" && exit 1)
+          test -f CLAUDE.md && echo "✅ CLAUDE.md" || (echo "❌ CLAUDE.md missing" && exit 1)
+          test -f docker-compose.yml && echo "✅ docker-compose.yml" || (echo "❌ docker-compose.yml missing" && exit 1)
+          test -f docker-compose.prod.yml && echo "✅ docker-compose.prod.yml" || (echo "❌ docker-compose.prod.yml missing" && exit 1)
+          test -f .env.example && echo "✅ .env.example" || (echo "❌ .env.example missing" && exit 1)
+          test -f infrastructure/Caddyfile && echo "✅ Caddyfile" || (echo "❌ Caddyfile missing" && exit 1)
+          test -f .claude/personas/po/CLAUDE.md && echo "✅ PO persona" || (echo "❌ PO persona CLAUDE.md missing" && exit 1)
+          test -f .claude/personas/dev/CLAUDE.md && echo "✅ Dev persona" || (echo "❌ Dev persona CLAUDE.md missing" && exit 1)
+          test -f .claude/personas/test/CLAUDE.md && echo "✅ Test persona" || (echo "❌ Test persona CLAUDE.md missing" && exit 1)
+          echo "All required files present."
+
+      - name: Verify .env is not committed
+        run: |
+          if git ls-files --error-unmatch .env 2>/dev/null; then
+            echo "❌ .env is committed — remove it immediately"
+            exit 1
+          else
+            echo "✅ .env is not committed"
+          fi
+
+  backend:
+    name: Backend Build
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check if backend exists
+        id: backend_check
+        run: |
+          if [ -f "backend/pom.xml" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ backend/pom.xml not found — skipping build. Add Spring Boot project to backend/ to enable."
+          fi
+
+      - name: Set up Java 21
+        if: steps.backend_check.outputs.exists == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build with Maven
+        if: steps.backend_check.outputs.exists == 'true'
+        working-directory: backend
+        run: mvn clean verify -q
+
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check if frontend exists
+        id: frontend_check
+        run: |
+          if [ -f "frontend/package.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "⚠️ frontend/package.json not found — skipping build. Add Next.js project to frontend/ to enable."
+          fi
+
+      - name: Set up Node.js
+        if: steps.frontend_check.outputs.exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        if: steps.frontend_check.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        if: steps.frontend_check.outputs.exists == 'true'
+        working-directory: frontend
+        run: npm run build

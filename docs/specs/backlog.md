@@ -8,5 +8,8 @@ Change password, delete account, update profile/email. Deferred because STORY-00
 ## Password Reset & Email Verification (deferred from Epic: User Authentication, 2026-08-11)
 Forgot-password flow and email verification on registration. Deferred because email-sending infrastructure is not yet part of the stack and Brian wants this out of the first epic's scope.
 
-## Account Linking: Google + Email/Password (surfaced during Epic: User Authentication, 2026-08-11)
-What happens when a Google sign-in email matches an existing email/password account — link, block, or error. Currently an open question on STORY-002; may need its own story once a decision is made.
+## Server-Side JWT Revocation (deferred from Epic: User Authentication, 2026-08-11)
+STORY-001's logout is client-side token discard only; a JWT remains technically valid until expiry even after logout. True server-side revocation (token blacklist via Redis or a DB table) is deferred as additional infrastructure not justified for the first epic.
+
+## Account Linking: Google + Email/Password (decided, deferred from Epic: User Authentication, 2026-08-11)
+Decision: blocked, not linked. If a Google sign-in email matches an existing email/password account, STORY-002 blocks sign-in with an error directing the user to sign in with their password. True account linking (letting one account use both methods) is a non-trivial UX flow, deferred as a possible future enhancement.

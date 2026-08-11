@@ -12,17 +12,17 @@ I can securely access my own personal streaming library, separate from every oth
 ## Acceptance Criteria
 - [ ] A user can register with an email address and password; the email must be unique across all accounts
 - [ ] Registration fails with a clear, user-facing error if the email is already registered
-- [ ] Registration fails with a clear, user-facing error if the password does not meet minimum security requirements
+- [ ] Registration fails with a clear, user-facing error if the password is under 8 characters, or does not contain at least one uppercase letter, one lowercase letter, and one number
 - [ ] User passwords are never stored or exposed in plain text, in any API response, log, or database field
 - [ ] A registered user can log in with correct email and password and receives a JWT representing their session
 - [ ] Login fails with a generic invalid-credentials error for wrong email or wrong password, without indicating which one was incorrect
-- [ ] A logged-in user can log out
+- [ ] A logged-in user can log out, which discards their JWT client-side
 - [ ] All authenticated endpoints reject requests without a valid JWT
 - [ ] A user can only ever read or modify their own library data, never another user's
 
 ## Notes
-- Open question: with stateless JWT, what does "logout" mean in practice — client-side token discard only, or does this require server-side revocation (e.g., a blacklist or short-lived tokens with refresh)? Needs a decision before Dev implementation, flagging for Brian/Dev.
-- Minimum password requirements (length/complexity) are a business rule this story depends on but does not dictate the exact threshold — needs a decision before implementation.
+- Logout is client-side token discard only for this story — there is no server-side revocation, so a JWT technically remains valid (per its expiration) even after logout. This is a known limitation, not a bug. Server-side revocation (token blacklist via Redis or a DB table) is a future enhancement, tracked in `docs/specs/backlog.md`.
+- Password complexity: minimum 8 characters, at least one uppercase letter, one lowercase letter, one number. No special character requirement by decision (adds friction without meaningful security benefit at this scale).
 - Rate limiting or lockout behavior on repeated failed logins is not addressed here; flagging as a possible future security hardening item, not blocking this story.
 
 ## Out of Scope

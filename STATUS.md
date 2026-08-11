@@ -49,7 +49,7 @@ Infrastructure Stabilization — completing local dev environment before PO/Dev/
 - [x] MongoDB Atlas connection string added to .env (local + EC2)
 
 ### CI/CD
-- [ ] GitHub Actions workflow: build on push to main
+- [x] GitHub Actions workflow: build on push to main
 
 ### Agentic Workflow Infrastructure
 - [x] Claude Code Docker image built (`claude-experience-img`)

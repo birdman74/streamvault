@@ -112,7 +112,7 @@ _None. STORY-001 and STORY-002 are unblocked and ready for Dev to pick up._
 
 | Resource | Detail |
 |---|---|
-| GitHub Repo | https://github.com/briankcampbell/streamvault |
+| GitHub Repo | https://github.com/birdman74/streamvault |
 | EC2 Elastic IP | 54.166.127.211 |
 | SSH Key | C:\Users\brian\.ssh\streamvault-key.pem |
 | EC2 User | ubuntu |

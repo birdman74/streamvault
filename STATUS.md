@@ -83,6 +83,14 @@ Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open quest
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.
 
+### Epic: Autonomous Agentic Workflow
+Spec: `docs/specs/epic-autonomous-agentic-workflow.md` — AWAITING BRIAN REVIEW
+
+- [ ] STORY-003: Local Build & Test Tooling in Dev and Test Containers (`docs/specs/story-003-dev-test-build-tooling.md`)
+- [ ] STORY-004: GitHub PR Automation for Dev and Test Personas (`docs/specs/story-004-github-pr-automation.md`)
+
+Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker for Test persona, GitHub App-based auth.
+
 ---
 
 ## Blocked Items

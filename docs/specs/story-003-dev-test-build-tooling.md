@@ -17,8 +17,9 @@ I can validate an implementation against a story's acceptance criteria before co
 - [ ] `mvn clean verify` runs successfully as a smoke test against the current backend skeleton (from the `chore(STORY-001)` bootstrap commit) inside both containers, with output visible in the persona's session
 
 ## Notes
+- Executed by Brian (not Dev persona). This is a container image/build change to the Dev and Test containers themselves — Dev cannot upgrade its own container from inside that container. Brian is the assignee for this story.
 - This story covers unit-level and Spring MockMvc-level testing only. Testcontainers-based integration testing is explicitly deferred, per Brian's decision, until there's a clearer security posture around mounting the host Docker socket into a container. Tracked in `docs/specs/backlog.md`.
-- This story is independently deliverable from STORY-004 (GitHub PR automation) — it does not depend on GitHub access working.
+- Tackled first — STORY-004 depends on this story's tooling being in place.
 
 ## Out of Scope
 - Testcontainers / any integration test requiring a Docker daemon inside the container (see `docs/specs/backlog.md`)

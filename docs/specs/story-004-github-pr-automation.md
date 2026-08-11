@@ -18,9 +18,10 @@ implementation and verification work can move from a local commit to a reviewabl
 - [ ] If the GitHub token is missing, invalid, or fails authentication, the persona fails with a clear, actionable error rather than silently skipping the PR or comment step
 
 ## Notes
+- Executed by Brian (not Dev persona). This is a container/credential change to the Dev and Test containers themselves — Dev cannot upgrade its own container from inside that container. Brian is the assignee for this story.
 - Authentication mechanism is a scoped personal access token (`gh` CLI or GitHub REST API), not a GitHub App, per Brian's decision to keep this simple for a personal project.
 - This is separate from the existing shared GitHub deploy key, which only covers `git push`/`pull` over SSH and cannot call the GitHub API to open PRs or post comments.
-- Builds on STORY-003 but is independently testable and deliverable — PR/comment automation does not depend on the build tooling working.
+- Depends on STORY-003 being done first — tackled second.
 
 ## Out of Scope
 - GitHub App-based authentication (see `docs/specs/backlog.md` framing above, decided against)

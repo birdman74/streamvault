@@ -18,10 +18,10 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-08-11
+2026-08-12
 
 ### Current Phase
-Application Development — User Authentication epic drafted by PO, pending Brian's review before Dev picks it up.
+Application Development — Dev persona bootstrapping the Spring Boot backend project skeleton (Java 25, CI workflow aligned to match) on `feature/STORY-001-email-password-auth` ahead of implementing STORY-001 acceptance criteria. Test persona reviewed the bootstrap skeleton (PR #2): added MockMvc coverage for the `/api/health` contract that was previously manual-only; no STORY-001 acceptance criteria apply yet since this PR is scoped to bootstrap only. READY FOR REVIEW.
 
 ---
 

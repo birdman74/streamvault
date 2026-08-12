@@ -14,6 +14,8 @@ class StreamvaultBackendApplicationTests {
         registry.add("spring.datasource.driver-class-name", () -> "org.h2.Driver");
         registry.add("spring.datasource.username", () -> "sa");
         registry.add("spring.datasource.password", () -> "");
+        registry.add("app.jwt.secret", () -> "test-secret-key-that-is-at-least-32-bytes-long");
+        registry.add("app.jwt.expiration-ms", () -> "86400000");
     }
 
     @Test

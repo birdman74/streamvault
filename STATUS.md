@@ -21,7 +21,7 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 2026-08-12
 
 ### Current Phase
-Application Development — Spring Boot backend project skeleton (Java 25, CI workflow aligned to match) completed on `feature/STORY-001-email-password-auth`. Next, Dev will implement STORY-001 auth implementation. Test persona reviewed the bootstrap skeleton (PR #2): added MockMvc coverage for the `/api/health` contract that was previously manual-only; no STORY-001 acceptance criteria apply yet since this PR is scoped to bootstrap only.
+Application Development — STORY-001 (email/password registration and login) implemented on `feature/STORY-001-email-password-auth`: Spring Security + stateless JWT auth, BCrypt password hashing, Flyway-managed `users` table, and input validation matching the story's password complexity rule. Pushed for Brian's review; not yet merged. Next up for Test persona once this branch is available for review.
 
 ---
 
@@ -78,7 +78,7 @@ Application Development — Spring Boot backend project skeleton (Java 25, CI wo
 ### Epic: User Authentication
 Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open questions resolved by Brian 2026-08-11)
 
-- [ ] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`)
+- [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — implemented on `feature/STORY-001-email-password-auth`, awaiting Test verification
 - [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`)
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.
@@ -95,7 +95,7 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 
 ## Blocked Items
 
-_None. STORY-001 and STORY-002 are unblocked and ready for Dev to pick up._
+_None. STORY-001 is implemented and awaiting Test verification. STORY-002 is unblocked and ready for Dev to pick up next._
 
 ---
 

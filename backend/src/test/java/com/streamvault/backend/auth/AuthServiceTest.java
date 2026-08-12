@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.streamvault.backend.auth.dto.AuthResponse;
 import com.streamvault.backend.auth.dto.LoginRequest;
@@ -68,15 +69,17 @@ class AuthServiceTest {
     @Test
     void loginReturnsTokenForValidCredentials() {
         User user = new User("user@example.com", "hashed-password");
+        ReflectionTestUtils.setField(user, "id", 42L);
         LoginRequest request = new LoginRequest("user@example.com", "Password1");
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("Password1", "hashed-password")).thenReturn(true);
-        when(jwtService.generateToken(null, "user@example.com")).thenReturn("jwt-token");
+        when(jwtService.generateToken(42L, "user@example.com")).thenReturn("jwt-token");
 
         AuthResponse response = authService.login(request);
 
         assertThat(response.token()).isEqualTo("jwt-token");
         assertThat(response.tokenType()).isEqualTo("Bearer");
+        verify(jwtService).generateToken(42L, "user@example.com");
     }
 
     @Test

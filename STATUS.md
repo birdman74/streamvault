@@ -21,7 +21,7 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 2026-08-12
 
 ### Current Phase
-Application Development — STORY-001 (email/password registration and login) implemented on `feature/STORY-001-email-password-auth`: Spring Security + stateless JWT auth, BCrypt password hashing, Flyway-managed `users` table, and input validation matching the story's password complexity rule. Pushed for Brian's review; not yet merged. Next up for Test persona once this branch is available for review.
+Application Development — STORY-001 (email/password registration and login) implemented on `feature/STORY-001-email-password-auth`: Spring Security + stateless JWT auth, BCrypt password hashing, Flyway-managed `users` table, and input validation matching the story's password complexity rule. Test persona reviewed the implementation and added missing MockMvc/full-stack coverage (registration, login, JWT-protected endpoint access) that the Dev commit's unit-only tests did not exercise; all 9 testable acceptance criteria pass. READY FOR REVIEW — awaiting Brian.
 
 ---
 
@@ -78,7 +78,7 @@ Application Development — STORY-001 (email/password registration and login) im
 ### Epic: User Authentication
 Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open questions resolved by Brian 2026-08-11)
 
-- [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — implemented on `feature/STORY-001-email-password-auth`, awaiting Test verification
+- [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — implemented on `feature/STORY-001-email-password-auth`, verified by Test, READY FOR REVIEW
 - [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`)
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.
@@ -95,7 +95,7 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 
 ## Blocked Items
 
-_None. STORY-001 is implemented and awaiting Test verification. STORY-002 is unblocked and ready for Dev to pick up next._
+_None. STORY-001 is implemented and Test-verified; READY FOR REVIEW pending Brian. STORY-002 is unblocked and ready for Dev to pick up next._
 
 ---
 

@@ -21,7 +21,7 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 2026-08-12
 
 ### Current Phase
-Application Development — Dev persona bootstrapping the Spring Boot backend project skeleton (Java 25, CI workflow aligned to match) on `feature/STORY-001-email-password-auth` ahead of implementing STORY-001 acceptance criteria. Test persona reviewed the bootstrap skeleton (PR #2): added MockMvc coverage for the `/api/health` contract that was previously manual-only; no STORY-001 acceptance criteria apply yet since this PR is scoped to bootstrap only. READY FOR REVIEW.
+Application Development — Spring Boot backend project skeleton (Java 25, CI workflow aligned to match) completed on `feature/STORY-001-email-password-auth`. Next, Dev will implement STORY-001 auth implementation. Test persona reviewed the bootstrap skeleton (PR #2): added MockMvc coverage for the `/api/health` contract that was previously manual-only; no STORY-001 acceptance criteria apply yet since this PR is scoped to bootstrap only.
 
 ---
 
@@ -65,8 +65,8 @@ Application Development — Dev persona bootstrapping the Spring Boot backend pr
 ## Application Milestones
 
 - [x] First epic defined by PO (user authentication)
-- [ ] First story implemented by Dev
-- [ ] First story verified by Test
+- [x] First story implemented by Dev
+- [x] First story verified by Test
 - [ ] First AI-powered feature end-to-end (LiteLLM + Ollama)
 - [ ] Demoable to an interviewer
 - [ ] AWS Bedrock production path confirmed
@@ -103,7 +103,7 @@ _None. STORY-001 and STORY-002 are unblocked and ready for Dev to pick up._
 
 | Layer | Technology |
 |---|---|
-| Backend | Java 21, Spring Boot 3.x, Spring AI |
+| Backend | Java 25, Spring Boot 3.5.16, Spring AI |
 | Frontend | Next.js 14+, TypeScript |
 | Relational DB | PostgreSQL |
 | Document DB | MongoDB Atlas (M0 free tier) |

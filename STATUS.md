@@ -87,7 +87,7 @@ Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Rese
 Spec: `docs/specs/epic-autonomous-agentic-workflow.md` — READY (assignee: Brian, both stories are infrastructure changes to the persona containers themselves, not Dev persona work)
 
 - [x] STORY-003: Local Build & Test Tooling in Dev and Test Containers (`docs/specs/story-003-dev-test-build-tooling.md`) — tackled first
-- [ ] STORY-004: GitHub PR Automation for Dev and Test Personas (`docs/specs/story-004-github-pr-automation.md`) — depends on STORY-003
+- [x] STORY-004: GitHub PR Automation for Dev and Test Personas (`docs/specs/story-004-github-pr-automation.md`) — depends on STORY-003
 
 Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker for Test persona, GitHub App-based auth.
 

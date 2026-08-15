@@ -8,7 +8,7 @@ StreamVault is a personal streaming library tracker that allows users to manage 
 
 | Layer | Technology |
 |---|---|
-| Backend | Java 21, Spring Boot 3.x, Spring AI |
+| Backend | Java 25, Spring Boot 3.5.16, Spring AI |
 | Frontend | Next.js 14+, TypeScript |
 | Relational DB | PostgreSQL |
 | Document DB | MongoDB Atlas |

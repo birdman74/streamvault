@@ -18,10 +18,10 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-08-12
+2026-08-15
 
 ### Current Phase
-Application Development — STORY-001 (email/password registration and login) implemented on `feature/STORY-001-email-password-auth`: Spring Security + stateless JWT auth, BCrypt password hashing, Flyway-managed `users` table, and input validation matching the story's password complexity rule. Test persona reviewed the implementation and added missing MockMvc/full-stack coverage (registration, login, JWT-protected endpoint access) that the Dev commit's unit-only tests did not exercise; all 9 testable acceptance criteria pass. READY FOR REVIEW — awaiting Brian.
+Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) is next.
 
 ---
 
@@ -78,7 +78,7 @@ Application Development — STORY-001 (email/password registration and login) im
 ### Epic: User Authentication
 Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open questions resolved by Brian 2026-08-11)
 
-- [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — implemented on `feature/STORY-001-email-password-auth`, verified by Test, READY FOR REVIEW
+- [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — merged to main 2026-08-15
 - [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`)
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.

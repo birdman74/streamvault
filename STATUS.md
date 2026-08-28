@@ -22,10 +22,10 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 
 ### Current Phase
 Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) implementation
-complete: Dev implemented against `story-002-agreed.md` (migration, `User`/`UserRepository`
-extensions, `GoogleAuthService`, `GoogleTokenInfoVerifier`, exception handling, controller/security
-wiring), all of Test's failing tests plus Dev's own unit tests pass, and `mvn clean verify` is
-green. PR open targeting `main`, awaiting Test verification and Brian's review.
+verified: Test persona pulled `feature/story-002-google-oauth` (PR #4), ran `mvn clean verify`
+(40 tests, 0 failures, 0 errors), and confirmed all 6 ACs are covered by passing deterministic
+tests, including the AC-6 error message matching the story text exactly. Test Run Summary posted
+to PR #4 with recommendation APPROVED. PR open targeting `main`, awaiting Brian's review and merge.
 
 ---
 
@@ -83,7 +83,7 @@ green. PR open targeting `main`, awaiting Test verification and Brian's review.
 Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open questions resolved by Brian 2026-08-11)
 
 - [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — merged to main 2026-08-15
-- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — implemented on `feature/story-002-google-oauth` per `story-002-agreed.md`; PR open targeting `main`, pending Test verification.
+- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — implemented on `feature/story-002-google-oauth` per `story-002-agreed.md`; Test-verified (all 6 ACs passing, APPROVED), PR #4 open targeting `main`, pending Brian's review and merge.
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.
 
@@ -99,8 +99,8 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 
 ## Blocked Items
 
-_None. STORY-002 is implemented on `feature/story-002-google-oauth` with PR open targeting `main`,
-awaiting Test verification._
+_None. STORY-002 is implemented and Test-verified on `feature/story-002-google-oauth`, PR #4 open
+targeting `main`, awaiting Brian's review and merge._
 
 ---
 

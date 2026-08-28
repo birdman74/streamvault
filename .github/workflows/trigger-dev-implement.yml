@@ -2,9 +2,9 @@ name: Trigger Dev — Agreed Design, Begin Implementation
 
 on:
   push:
-    branches: ['feature/STORY-*']
+    branches: ['feature/story-*']
     paths:
-      - 'docs/specs/design/STORY-*-agreed.md'
+      - 'docs/specs/design/story-*-agreed.md'
 
 jobs:
   trigger-dev-implement:
@@ -19,7 +19,7 @@ jobs:
         id: context
         run: |
           CHANGED=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/design/' | head -1)
-          STORY_ID=$(echo "$CHANGED" | grep -oP 'STORY-\d+')
+          STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
           BRANCH="${{ github.ref_name }}"
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT

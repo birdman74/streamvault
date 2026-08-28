@@ -18,7 +18,7 @@ jobs:
         id: context
         run: |
           BRANCH="${{ github.head_ref }}"
-          STORY_ID=$(echo "$BRANCH" | grep -oP 'STORY-\d+')
+          STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
           PR_NUMBER="${{ github.event.pull_request.number }}"
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT

@@ -2,9 +2,9 @@ name: Trigger Test — Dev Feedback Requires Revision
 
 on:
   push:
-    branches: ['feature/STORY-*']
+    branches: ['feature/story-*']
     paths:
-      - 'docs/specs/design/STORY-*-dev-feedback-r*.md'
+      - 'docs/specs/design/story-*-dev-feedback-r*.md'
 
 jobs:
   trigger-test-revision:
@@ -19,7 +19,7 @@ jobs:
         id: context
         run: |
           CHANGED=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/design/' | head -1)
-          STORY_ID=$(echo "$CHANGED" | grep -oP 'STORY-\d+')
+          STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
           ROUND=$(echo "$CHANGED" | grep -oP 'r\d+' | grep -oP '\d+')
           BRANCH="${{ github.ref_name }}"
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT

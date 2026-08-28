@@ -2,10 +2,10 @@ name: Trigger Dev — Test Plan Ready for Review
 
 on:
   push:
-    branches: ['feature/STORY-*']
+    branches: ['feature/story-*']
     paths:
-      - 'docs/specs/design/STORY-*-test-plan.md'
-      - 'docs/specs/design/STORY-*-test-revision-r*.md'
+      - 'docs/specs/design/story-*-test-plan.md'
+      - 'docs/specs/design/story-*-test-revision-r*.md'
 
 jobs:
   trigger-dev-review:
@@ -20,7 +20,7 @@ jobs:
         id: context
         run: |
           CHANGED=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/design/' | head -1)
-          STORY_ID=$(echo "$CHANGED" | grep -oP 'STORY-\d+')
+          STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
           BRANCH="${{ github.ref_name }}"
 
           # Determine current round from existing feedback files

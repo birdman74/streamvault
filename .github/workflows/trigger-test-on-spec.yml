@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'docs/specs/STORY-*.md'
+      - 'docs/specs/story-*.md'
 
 jobs:
   trigger-test:
@@ -18,12 +18,12 @@ jobs:
       - name: Identify new story file
         id: story
         run: |
-          STORY_FILE=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/STORY-.*\.md' | head -1)
+          STORY_FILE=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/story-.*\.md' | head -1)
           if [ -z "$STORY_FILE" ]; then
             echo "No story file found in this commit — skipping."
             exit 0
           fi
-          STORY_ID=$(basename "$STORY_FILE" .md | grep -oP 'STORY-\d+')
+          STORY_ID=$(basename "$STORY_FILE" .md | grep -oP 'story-\d+')
           echo "story_file=$STORY_FILE" >> $GITHUB_OUTPUT
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "Detected story: $STORY_ID from $STORY_FILE"

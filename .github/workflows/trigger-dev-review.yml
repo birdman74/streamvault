@@ -1,0 +1,71 @@
+name: Trigger Dev — Test Plan Ready for Review
+
+on:
+  push:
+    branches: ['feature/STORY-*']
+    paths:
+      - 'docs/specs/design/STORY-*-test-plan.md'
+      - 'docs/specs/design/STORY-*-test-revision-r*.md'
+
+jobs:
+  trigger-dev-review:
+    runs-on: self-hosted
+    if: github.actor == 'birdman74' || github.actor == 'briankcampbell-streamvault-bot'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Identify story and round
+        id: context
+        run: |
+          CHANGED=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/design/' | head -1)
+          STORY_ID=$(echo "$CHANGED" | grep -oP 'STORY-\d+')
+          BRANCH="${{ github.ref_name }}"
+
+          # Determine current round from existing feedback files
+          ROUND=1
+          for i in 1 2 3; do
+            if [ -f "docs/specs/design/${STORY_ID}-dev-feedback-r${i}.md" ]; then
+              ROUND=$((i + 1))
+            fi
+          done
+
+          echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
+          echo "round=$ROUND" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "Story: $STORY_ID, Review round: $ROUND, Branch: $BRANCH"
+
+      - name: Check iteration limit
+        id: limit_check
+        run: |
+          ROUND=${{ steps.context.outputs.round }}
+          if [ "$ROUND" -gt 3 ]; then
+            echo "limit_reached=true" >> $GITHUB_OUTPUT
+          else
+            echo "limit_reached=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Open escalation issue if limit reached
+        if: steps.limit_check.outputs.limit_reached == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const storyId = '${{ steps.context.outputs.story_id }}';
+            const branch = '${{ steps.context.outputs.branch }}';
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `⚠️ ${storyId}: Design iteration limit reached — Brian review required`,
+              body: `## Design Iteration Impasse\n\nTest and Dev have completed 3 rounds of design iteration on **${storyId}** without reaching agreement.\n\n**Branch**: \`${branch}\`\n\n**Design artifacts**: \`docs/specs/design/${storyId}-*\`\n\n### What to do\n1. Review the feedback files on the branch to understand the disagreement\n2. Make a decision and update the story spec if needed\n3. Manually commit \`docs/specs/design/${storyId}-agreed.md\` to unblock implementation\n\nThe automated workflow is paused until \`${storyId}-agreed.md\` is committed.`,
+              labels: ['needs-brian', 'blocked']
+            });
+
+      - name: Launch Dev persona for review
+        if: steps.limit_check.outputs.limit_reached == 'false'
+        env:
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          REVIEW_ROUND: ${{ steps.context.outputs.round }}
+          FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
+        run: |
+          /home/brian/bin/streamvault-dev-auto.sh "Test has committed a design artifact to feature branch ${FEATURE_BRANCH} for ${STORY_ID}. This is review round ${REVIEW_ROUND}. Read docs/specs/design/${STORY_ID}-test-plan.md and all revision files up to this round. Execute your design review phase per your CLAUDE.md: either commit ${STORY_ID}-agreed.md if you accept the design, or commit ${STORY_ID}-dev-feedback-r${REVIEW_ROUND}.md with specific actionable concerns."

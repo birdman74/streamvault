@@ -1,0 +1,36 @@
+name: Trigger Test — Dev Feedback Requires Revision
+
+on:
+  push:
+    branches: ['feature/STORY-*']
+    paths:
+      - 'docs/specs/design/STORY-*-dev-feedback-r*.md'
+
+jobs:
+  trigger-test-revision:
+    runs-on: self-hosted
+    if: github.actor == 'birdman74' || github.actor == 'briankcampbell-streamvault-bot'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Identify story and round
+        id: context
+        run: |
+          CHANGED=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/design/' | head -1)
+          STORY_ID=$(echo "$CHANGED" | grep -oP 'STORY-\d+')
+          ROUND=$(echo "$CHANGED" | grep -oP 'r\d+' | grep -oP '\d+')
+          BRANCH="${{ github.ref_name }}"
+          echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
+          echo "round=$ROUND" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "Story: $STORY_ID, Revision round: $ROUND"
+
+      - name: Launch Test persona for revision
+        env:
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          REVISION_ROUND: ${{ steps.context.outputs.round }}
+          FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
+        run: |
+          /home/brian/bin/streamvault-test-auto.sh "Dev has committed feedback file docs/specs/design/${STORY_ID}-dev-feedback-r${REVISION_ROUND}.md on branch ${FEATURE_BRANCH}. Read Dev's concerns carefully and execute your revision phase per your CLAUDE.md: revise the test plan and contracts where Dev's feedback is technically valid without dropping AC coverage, then commit ${STORY_ID}-test-revision-r${REVISION_ROUND}.md."

@@ -1,0 +1,33 @@
+name: Trigger Dev — Agreed Design, Begin Implementation
+
+on:
+  push:
+    branches: ['feature/STORY-*']
+    paths:
+      - 'docs/specs/design/STORY-*-agreed.md'
+
+jobs:
+  trigger-dev-implement:
+    runs-on: self-hosted
+    if: github.actor == 'birdman74' || github.actor == 'briankcampbell-streamvault-bot'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Identify story
+        id: context
+        run: |
+          CHANGED=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/design/' | head -1)
+          STORY_ID=$(echo "$CHANGED" | grep -oP 'STORY-\d+')
+          BRANCH="${{ github.ref_name }}"
+          echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "Agreement reached for $STORY_ID on $BRANCH — triggering implementation"
+
+      - name: Launch Dev persona for implementation
+        env:
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
+        run: |
+          /home/brian/bin/streamvault-dev-auto.sh "Design agreement has been reached for ${STORY_ID} on branch ${FEATURE_BRANCH}. Read docs/specs/design/${STORY_ID}-agreed.md and execute your implementation phase per your CLAUDE.md: write failing unit tests first, implement until all tests pass including Test's failing tests, then open a PR as the bot account targeting main."

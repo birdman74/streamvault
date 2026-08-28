@@ -1,0 +1,36 @@
+name: Trigger Test — New Story Spec
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/specs/STORY-*.md'
+
+jobs:
+  trigger-test:
+    runs-on: self-hosted
+    if: github.actor == 'birdman74' || github.actor == 'briankcampbell-streamvault-bot'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Identify new story file
+        id: story
+        run: |
+          STORY_FILE=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/STORY-.*\.md' | head -1)
+          if [ -z "$STORY_FILE" ]; then
+            echo "No story file found in this commit — skipping."
+            exit 0
+          fi
+          STORY_ID=$(basename "$STORY_FILE" .md | grep -oP 'STORY-\d+')
+          echo "story_file=$STORY_FILE" >> $GITHUB_OUTPUT
+          echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
+          echo "Detected story: $STORY_ID from $STORY_FILE"
+
+      - name: Launch Test persona
+        if: steps.story.outputs.story_id != ''
+        env:
+          STORY_ID: ${{ steps.story.outputs.story_id }}
+        run: |
+          /home/brian/bin/streamvault-test-auto.sh "A new user story has been committed to docs/specs/. Read the story file docs/specs/ for ${STORY_ID} and execute Phase 1 of your workflow: create the feature branch feature/${STORY_ID}-<short-description>, write the test plan, define API contracts, write failing automated tests, and commit all artifacts to the feature branch per your CLAUDE.md instructions."

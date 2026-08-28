@@ -4,11 +4,22 @@ on:
   pull_request:
     types: [opened, reopened]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      story_id:
+        description: 'Story ID (e.g. story-002)'
+        required: true
+      feature_branch:
+        description: 'Feature branch name (e.g. feature/story-002-google-oauth)'
+        required: true
+      pr_number:
+        description: 'Pull request number'
+        required: true
 
 jobs:
   trigger-test-review:
     runs-on: self-hosted
-    if: github.actor == 'briankcampbell-streamvault-bot'
+    if: github.actor == 'briankcampbell-streamvault-bot' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout
@@ -17,9 +28,16 @@ jobs:
       - name: Identify story from branch name
         id: context
         run: |
-          BRANCH="${{ github.head_ref }}"
-          STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
-          PR_NUMBER="${{ github.event.pull_request.number }}"
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            STORY_ID="${{ github.event.inputs.story_id }}"
+            BRANCH="${{ github.event.inputs.feature_branch }}"
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+          else
+            BRANCH="${{ github.head_ref }}"
+            STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          fi
+
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
@@ -31,4 +49,5 @@ jobs:
           PR_NUMBER: ${{ steps.context.outputs.pr_number }}
           FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
         run: |
-          /home/brian/bin/streamvault-test-auto.sh "Dev has opened PR #${PR_NUMBER} for ${STORY_ID} on branch ${FEATURE_BRANCH}. Execute your final verification phase per your CLAUDE.md: pull the branch, run the full test suite, verify every AC-N criterion is covered by a passing test, and post your structured test run summary as a PR comment. Set status to APPROVED or CHANGES REQUESTED."
+          echo "Launching Test persona for final review of $STORY_ID PR #$PR_NUMBER..."
+          /home/brian/bin/streamvault-test-auto.sh "Dev has opened PR #$PR_NUMBER for $STORY_ID on branch $FEATURE_BRANCH. Execute your final verification phase per your CLAUDE.md: pull the branch, run the full test suite, verify every AC-N criterion is covered by a passing test, and post your structured test run summary as a PR comment. Set status to APPROVED or CHANGES REQUESTED."

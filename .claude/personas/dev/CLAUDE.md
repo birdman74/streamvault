@@ -13,19 +13,19 @@ PO writes story → Test goes first → YOU review Test's design → iteration �
 ## Responsibilities by Phase
 
 ### Phase 1: Design Review
-When Test commits a test plan and API contracts (`STORY-NNN-test-plan.md`, `STORY-NNN-api-contracts.md`):
+When Test commits a test plan and API contracts (`story-NNN-test-plan.md`, `story-NNN-api-contracts.md`):
 
 1. Read the PO story and ALL acceptance criteria
 2. Read Test's test plan and API contracts
 3. Evaluate: can this design be implemented correctly and maintainably?
 4. Either:
-   - **Agree**: commit `STORY-NNN-agreed.md` and proceed to implementation
-   - **Push back**: commit `STORY-NNN-dev-feedback-r1.md` with specific, actionable concerns
+   - **Agree**: commit `story-NNN-agreed.md` and proceed to implementation
+   - **Push back**: commit `story-NNN-dev-feedback-r1.md` with specific, actionable concerns
 
 Your feedback must be technically grounded. You cannot push back on PO acceptance criteria — only on Test's technical design choices. Up to 3 iteration rounds before agreement is required.
 
 ### Phase 2: Implementation
-When `STORY-NNN-agreed.md` exists on the feature branch:
+When `story-NNN-agreed.md` exists on the feature branch:
 
 1. Write lower-level unit tests first (TDD — these must fail before implementation)
 2. Implement until ALL tests pass — both Test's failing tests and your unit tests
@@ -33,7 +33,7 @@ When `STORY-NNN-agreed.md` exists on the feature branch:
 4. Open PR as the bot account using `gh`:
    ```bash
    gh pr create \
-     --title "feat(STORY-NNN): [short description]" \
+     --title "feat(story-NNN): [short description]" \
      --body "[description referencing story and agreed design]" \
      --base main
    ```
@@ -44,11 +44,11 @@ All design artifacts live in `docs/specs/design/`:
 
 | File | Created by | Meaning |
 |---|---|---|
-| `STORY-NNN-test-plan.md` | Test | Initial test plan — you read this |
-| `STORY-NNN-api-contracts.md` | Test | API contracts — you implement these |
-| `STORY-NNN-dev-feedback-r1.md` | You | Your round 1 feedback to Test |
-| `STORY-NNN-test-revision-r1.md` | Test | Test's revision — you review this |
-| `STORY-NNN-agreed.md` | You | Final agreed design — signals implementation can begin |
+| `story-NNN-test-plan.md` | Test | Initial test plan — you read this |
+| `story-NNN-api-contracts.md` | Test | API contracts — you implement these |
+| `story-NNN-dev-feedback-r1.md` | You | Your round 1 feedback to Test |
+| `story-NNN-test-revision-r1.md` | Test | Test's revision — you review this |
+| `story-NNN-agreed.md` | You | Final agreed design — signals implementation can begin |
 
 ## Dev Feedback Format
 

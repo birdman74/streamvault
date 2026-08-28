@@ -18,7 +18,7 @@ When a new story appears in docs/specs/:
 1. Create the feature branch:
    ```
    git checkout main && git pull origin main
-   git checkout -b feature/STORY-NNN-short-kebab-case-description
+   git checkout -b feature/story-NNN-short-kebab-case-description
    ```
 2. Read the story and ALL acceptance criteria carefully
 3. Write a test plan mapped explicitly to each AC-N label
@@ -26,21 +26,25 @@ When a new story appears in docs/specs/:
 5. Write automated failing tests covering every acceptance criterion
 6. Commit to the feature branch:
    ```
-   docs/specs/design/STORY-NNN-test-plan.md
-   docs/specs/design/STORY-NNN-api-contracts.md
+   docs/specs/design/story-NNN-test-plan.md
+   docs/specs/design/story-NNN-api-contracts.md
    src/test/...  (failing tests)
    ```
-7. Commit message: `test(STORY-NNN): initial test plan, API contracts, and failing tests`
+7. Commit message: `test(story-NNN): initial test plan, API contracts, and failing tests`
+8. Push the new feature branch:
+   ```
+   git push origin feature/story-NNN-short-kebab-case-description
+   ```
 
 ### Phase 2: Design Iteration with Dev (up to 3 rounds)
-When Dev commits a feedback file (`STORY-NNN-dev-feedback-rN.md`):
+When Dev commits a feedback file (`story-NNN-dev-feedback-rN.md`):
 
 - Read Dev's concerns carefully
 - Revise test plan and/or contracts where Dev's feedback is technically valid
 - Your acceptance criteria mapping must remain complete — you cannot drop coverage to satisfy Dev
 - If Dev's feedback conflicts with a PO acceptance criterion, surface it to Brian — do not resolve silently
-- Commit revised artifacts as `STORY-NNN-test-revision-rN.md`
-- If agreeing to proceed, commit `STORY-NNN-agreed.md` summarizing the final agreed design
+- Commit revised artifacts as `story-NNN-test-revision-rN.md`
+- If agreeing to proceed, commit `story-NNN-agreed.md` summarizing the final agreed design
 
 ### Phase 3: Final Verification
 When Dev opens a PR:
@@ -57,18 +61,18 @@ All design artifacts live in `docs/specs/design/`:
 
 | File | Created by | Meaning |
 |---|---|---|
-| `STORY-NNN-test-plan.md` | Test | Initial test plan mapped to AC-N labels |
-| `STORY-NNN-api-contracts.md` | Test | API endpoint definitions |
-| `STORY-NNN-dev-feedback-r1.md` | Dev | Dev's round 1 feedback |
-| `STORY-NNN-test-revision-r1.md` | Test | Test's round 1 revision |
-| `STORY-NNN-dev-feedback-r2.md` | Dev | Dev's round 2 feedback |
-| `STORY-NNN-test-revision-r2.md` | Test | Test's round 2 revision |
-| `STORY-NNN-agreed.md` | Dev | Signals agreement, triggers implementation |
+| `story-NNN-test-plan.md` | Test | Initial test plan mapped to AC-N labels |
+| `story-NNN-api-contracts.md` | Test | API endpoint definitions |
+| `story-NNN-dev-feedback-r1.md` | Dev | Dev's round 1 feedback |
+| `story-NNN-test-revision-r1.md` | Test | Test's round 1 revision |
+| `story-NNN-dev-feedback-r2.md` | Dev | Dev's round 2 feedback |
+| `story-NNN-test-revision-r2.md` | Test | Test's round 2 revision |
+| `story-NNN-agreed.md` | Dev | Signals agreement, triggers implementation |
 
 ## Test Plan Format
 
 ```markdown
-# Test Plan — STORY-NNN: [Title]
+# Test Plan — story-NNN: [Title]
 
 ## Acceptance Criteria Coverage
 | AC | Criterion | Test(s) |
@@ -77,7 +81,7 @@ All design artifacts live in `docs/specs/design/`:
 | AC-2 | [criterion text] | [test method name(s)] |
 
 ## API Contracts
-See STORY-NNN-api-contracts.md
+See story-NNN-api-contracts.md
 
 ## Test Strategy
 [integration vs unit split, any special setup needed]
@@ -89,7 +93,7 @@ See STORY-NNN-api-contracts.md
 ## Test Run Summary Format (PR comment)
 
 ```markdown
-# Test Run Summary — STORY-NNN
+# Test Run Summary — story-NNN
 
 ## Acceptance Criteria Coverage
 - AC-1: ✅ PASS — should_[test name]
@@ -125,7 +129,7 @@ Every commit must include STATUS.md updated in the same commit.
 
 ```
 git add STATUS.md docs/specs/design/<file> src/test/...
-git commit -m "test(STORY-NNN): your message"
+git commit -m "test(story-NNN): your message"
 ```
 
 ## What You Do Not Do

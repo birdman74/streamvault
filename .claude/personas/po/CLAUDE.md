@@ -26,13 +26,13 @@ You are the first persona in the chain. Your output triggers the Test persona au
 ## Goal
 [One paragraph describing the business goal and user value]
 ## Stories
-- STORY-001: [title]
-- STORY-002: [title]
+- story-001: [title]
+- story-002: [title]
 ```
 
 ### User Story
 ```
-# STORY-[NNN]: [Title]
+# story-[NNN]: [Title]
 ## As a...
 [user type]
 ## I want to...

@@ -21,8 +21,9 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 2026-08-28
 
 ### Current Phase
-Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) test plan,
-API contracts, and failing tests committed by Test; awaiting Dev design review.
+Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) design review
+round 1 complete: Dev requested revisions (emailVerified trust-boundary gap, @Transactional scope
+around the Google network call). Awaiting Test's round 1 revision.
 
 ---
 

@@ -18,10 +18,11 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-08-15
+2026-08-28
 
 ### Current Phase
-Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) is next.
+Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) test plan,
+API contracts, and failing tests committed by Test; awaiting Dev design review.
 
 ---
 
@@ -79,7 +80,7 @@ Application Development — STORY-001 complete and merged. STORY-002 (Google OAu
 Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open questions resolved by Brian 2026-08-11)
 
 - [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — merged to main 2026-08-15
-- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`)
+- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — Phase 1 complete (Test): test plan, API contracts, and failing tests on `feature/story-002-google-oauth`. Awaiting Dev review (Phase 2).
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.
 
@@ -95,7 +96,8 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 
 ## Blocked Items
 
-_None. STORY-001 is implemented and awaiting Test verification. STORY-002 is unblocked and ready for Dev to pick up next._
+_None. STORY-002's test plan, API contracts, and failing tests are committed on
+`feature/story-002-google-oauth`, awaiting Dev's design review round (Phase 2)._
 
 ---
 

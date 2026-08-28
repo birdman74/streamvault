@@ -1,6 +1,5 @@
 # STORY-002: Google OAuth2 Sign-In
 
-
 ## As a...
 new or returning StreamVault user
 

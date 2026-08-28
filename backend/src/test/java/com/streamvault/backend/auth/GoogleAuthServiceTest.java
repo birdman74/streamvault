@@ -153,4 +153,26 @@ class GoogleAuthServiceTest {
         verify(userRepository, never()).findByGoogleId(any());
         verify(userRepository, never()).findByEmail(any());
     }
+
+    @Test
+    void should_throwGoogleSignInException_when_emailNotVerified() {
+        GoogleSignInRequest request = new GoogleSignInRequest(ID_TOKEN);
+        when(googleTokenVerifier.verify(ID_TOKEN)).thenReturn(new GoogleUserInfo(GOOGLE_ID, EMAIL, false));
+
+        assertThatThrownBy(() -> googleAuthService.googleSignIn(request))
+                .isInstanceOf(GoogleSignInException.class);
+    }
+
+    @Test
+    void should_neverCallUserRepository_when_emailNotVerified() {
+        GoogleSignInRequest request = new GoogleSignInRequest(ID_TOKEN);
+        when(googleTokenVerifier.verify(ID_TOKEN)).thenReturn(new GoogleUserInfo(GOOGLE_ID, EMAIL, false));
+
+        assertThatThrownBy(() -> googleAuthService.googleSignIn(request))
+                .isInstanceOf(GoogleSignInException.class);
+
+        verify(userRepository, never()).findByGoogleId(any());
+        verify(userRepository, never()).findByEmail(any());
+        verify(userRepository, never()).save(any(User.class));
+    }
 }

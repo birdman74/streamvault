@@ -114,8 +114,12 @@ tokeninfo endpoint or `google-api-client`'s `GoogleIdTokenVerifier`). Kept as an
 `GoogleAuthService` can be unit tested without network calls or real Google credentials.
 
 ### `com.streamvault.backend.auth.exception.GoogleSignInException`
-`RuntimeException`, thrown by `GoogleTokenVerifier` implementations and caught nowhere else —
-propagates to `GlobalExceptionHandler`, mapped to 401 with the fixed message above.
+`RuntimeException`, thrown by `GoogleTokenVerifier` implementations on any verification failure,
+and also thrown directly by `GoogleAuthService` when `GoogleUserInfo.emailVerified()` is `false`
+(the two cases share this exception rather than a distinct type, since both are Google-side trust
+failures that resolve to the same 401 response and there is no AC requiring them to be
+distinguishable at the API layer). Caught nowhere else — propagates to `GlobalExceptionHandler`,
+mapped to 401 with the fixed message above.
 
 ### `com.streamvault.backend.auth.exception.GoogleAccountEmailCollisionException`
 `RuntimeException`, thrown by `GoogleAuthService` when the verified email belongs to an existing
@@ -126,22 +130,31 @@ exact string).
 ```java
 class GoogleAuthService {
     GoogleAuthService(UserRepository userRepository, JwtService jwtService, GoogleTokenVerifier googleTokenVerifier);
-    AuthResponse googleSignIn(GoogleSignInRequest request); // @Transactional
+    AuthResponse googleSignIn(GoogleSignInRequest request);
 }
 ```
 
 Resolution order:
 1. Call `googleTokenVerifier.verify(request.idToken())`. Any exception propagates as-is
    (`GoogleSignInException`) — no account is touched.
-2. Look up `userRepository.findByGoogleId(googleId)`. If found, issue a JWT for that user
+2. Check `result.emailVerified()`. If `false`, throw `GoogleSignInException` immediately — no
+   repository lookup occurs and no account is touched. This runs before step 3 so an unverified
+   email can never be used to resolve, create, or collide against a StreamVault account.
+3. Look up `userRepository.findByGoogleId(googleId)`. If found, issue a JWT for that user
    (returning-user path). No new row is written.
-3. Else look up `userRepository.findByEmail(email)`.
+4. Else look up `userRepository.findByEmail(email)`.
    - If found and it is a local account (`passwordHash != null`), throw
      `GoogleAccountEmailCollisionException`. No account is created or linked.
    - If not found, create a new `User` via `User.googleUser(email, googleId)`, save it, and issue
      a JWT for it (first-sign-in path, AC-2).
-4. The verify-then-resolve-then-save sequence runs inside a single transaction so that a failure
-   partway through (e.g. save fails) never leaves a partial account (AC-5).
+
+No `@Transactional` boundary: the only DB work in this method is one `findByGoogleId`/`findByEmail`
+read followed by at most one `save()`, already atomic as a single statement, so there is nothing to
+roll back across. Wrapping the method would also hold a checked-out Postgres connection for the
+duration of step 1's outbound HTTPS call to Google, which is a connection-pool exhaustion risk on
+this project's t3.micro Postgres under concurrent sign-in load. AC-5's "no partial account on
+failure" guarantee holds without a transaction: both failure paths (steps 1-2 and the collision
+branch of step 4) return before any write is attempted.
 
 Kept as a separate service from STORY-001's `AuthService` (rather than extending it) so the
 existing `AuthService` constructor and its STORY-001 test suite are untouched by this story.

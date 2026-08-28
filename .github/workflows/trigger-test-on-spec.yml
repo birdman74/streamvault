@@ -33,7 +33,7 @@ jobs:
             STORY_ID="${{ github.event.inputs.story_id }}"
           else
             STORY_FILE=$(echo '${{ toJson(github.event.commits) }}' | \
-              grep -oP 'docs/specs/story-\d+[^"]*\.md' | head -1)
+              jq -r '.[].modified[], .[].added[] | select(test("docs/specs/story-[0-9]+-.*\\.md"))' 2>/dev/null | head -1)
             STORY_ID=$(echo "$STORY_FILE" | grep -oP 'story-\d+')
           fi
 

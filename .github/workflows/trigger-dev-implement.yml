@@ -5,6 +5,14 @@ on:
     branches: ['feature/story-*']
     paths:
       - 'docs/specs/design/story-*-agreed.md'
+  workflow_dispatch:
+    inputs:
+      story_id:
+        description: 'Story ID (e.g. story-002)'
+        required: true
+      feature_branch:
+        description: 'Feature branch name (e.g. feature/story-002-google-oauth)'
+        required: true
 
 jobs:
   trigger-dev-implement:
@@ -20,10 +28,16 @@ jobs:
       - name: Identify story
         id: context
         run: |
-          CHANGED=$(echo '${{ toJson(github.event.commits) }}' | \
-            grep -oP 'docs/specs/design/story-\d+[^"]*\.md' | head -1)
-          STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
-          BRANCH="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            STORY_ID="${{ github.event.inputs.story_id }}"
+            BRANCH="${{ github.event.inputs.feature_branch }}"
+          else
+            CHANGED=$(echo '${{ toJson(github.event.commits) }}' | \
+              grep -oP 'docs/specs/design/story-\d+[^"]*\.md' | head -1)
+            STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
+            BRANCH="${{ github.ref_name }}"
+          fi
+
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
           echo "Agreement reached for $STORY_ID on $BRANCH — triggering implementation"

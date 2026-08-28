@@ -5,6 +5,18 @@ on:
     branches: ['feature/story-*']
     paths:
       - 'docs/specs/design/story-*-dev-feedback-r*.md'
+  workflow_dispatch:
+    inputs:
+      story_id:
+        description: 'Story ID (e.g. story-002)'
+        required: true
+      feature_branch:
+        description: 'Feature branch name (e.g. feature/story-002-google-oauth)'
+        required: true
+      revision_round:
+        description: 'Revision round number (1, 2, or 3)'
+        required: true
+        default: '1'
 
 jobs:
   trigger-test-revision:
@@ -20,15 +32,22 @@ jobs:
       - name: Identify story and round
         id: context
         run: |
-          CHANGED=$(echo '${{ toJson(github.event.commits) }}' | \
-            grep -oP 'docs/specs/design/story-\d+[^"]*\.md' | head -1)
-          STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
-          ROUND=$(echo "$CHANGED" | grep -oP 'r\d+' | grep -oP '\d+')
-          BRANCH="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            STORY_ID="${{ github.event.inputs.story_id }}"
+            BRANCH="${{ github.event.inputs.feature_branch }}"
+            ROUND="${{ github.event.inputs.revision_round }}"
+          else
+            CHANGED=$(echo '${{ toJson(github.event.commits) }}' | \
+              grep -oP 'docs/specs/design/story-\d+[^"]*\.md' | head -1)
+            STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
+            ROUND=$(echo "$CHANGED" | grep -oP 'r\d+' | grep -oP '\d+')
+            BRANCH="${{ github.ref_name }}"
+          fi
+
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "round=$ROUND" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-          echo "Story: $STORY_ID, Revision round: $ROUND"
+          echo "Story: $STORY_ID, Revision round: $ROUND, Branch: $BRANCH"
 
       - name: Launch Test persona for revision
         env:

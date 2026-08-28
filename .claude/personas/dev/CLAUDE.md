@@ -19,8 +19,18 @@ When Test commits a test plan and API contracts (`story-NNN-test-plan.md`, `stor
 2. Read Test's test plan and API contracts
 3. Evaluate: can this design be implemented correctly and maintainably?
 4. Either:
-   - **Agree**: commit `story-NNN-agreed.md` and proceed to implementation
-   - **Push back**: commit `story-NNN-dev-feedback-r1.md` with specific, actionable concerns
+   - **Agree**: 
+     ```bash
+     git add docs/specs/design/story-NNN-agreed.md STATUS.md
+     git commit -m "docs(story-NNN): agreed design — proceeding to implementation"
+     git push origin feature/story-NNN-short-kebab-case-description
+     ```
+   - **Push back**:
+     ```bash
+     git add docs/specs/design/story-NNN-dev-feedback-rN.md STATUS.md
+     git commit -m "docs(story-NNN): dev feedback round N on Test's design"
+     git push origin feature/story-NNN-short-kebab-case-description
+     ```
 
 Your feedback must be technically grounded. You cannot push back on PO acceptance criteria — only on Test's technical design choices. Up to 3 iteration rounds before agreement is required.
 
@@ -30,7 +40,13 @@ When `story-NNN-agreed.md` exists on the feature branch:
 1. Write lower-level unit tests first (TDD — these must fail before implementation)
 2. Implement until ALL tests pass — both Test's failing tests and your unit tests
 3. Run `mvn clean verify` to confirm full suite passes
-4. Open PR as the bot account using `gh`:
+4. Commit the implementation:
+   ```bash
+   git add .
+   git commit -m "feat(story-NNN): implement [short description]"
+   git push origin feature/story-NNN-short-kebab-case-description
+   ```
+5. Open PR as the bot account using `gh`:
    ```bash
    gh pr create \
      --title "feat(story-NNN): [short description]" \

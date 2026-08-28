@@ -36,6 +36,9 @@ class AuthControllerGoogleTest {
     @MockitoBean
     private GoogleAuthService googleAuthService;
 
+    @MockitoBean
+    private JwtService jwtService;
+
     @Test
     void should_return200WithToken_when_googleSignInSucceedsForNewUser() throws Exception {
         when(googleAuthService.googleSignIn(any())).thenReturn(new AuthResponse("jwt-token"));

@@ -21,11 +21,11 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 2026-08-28
 
 ### Current Phase
-Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) design review
-complete after round 1: Dev's two round 1 concerns (emailVerified trust-boundary gap,
-@Transactional scope around the Google network call) were both accepted by Test in
-`story-002-test-revision-r1.md`. Dev reviewed the revised design in round 2 and found no further
-issues; `story-002-agreed.md` committed. Implementation phase starting next.
+Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) implementation
+complete: Dev implemented against `story-002-agreed.md` (migration, `User`/`UserRepository`
+extensions, `GoogleAuthService`, `GoogleTokenInfoVerifier`, exception handling, controller/security
+wiring), all of Test's failing tests plus Dev's own unit tests pass, and `mvn clean verify` is
+green. PR open targeting `main`, awaiting Test verification and Brian's review.
 
 ---
 
@@ -83,7 +83,7 @@ issues; `story-002-agreed.md` committed. Implementation phase starting next.
 Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open questions resolved by Brian 2026-08-11)
 
 - [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — merged to main 2026-08-15
-- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — design agreed on `feature/story-002-google-oauth` (`story-002-agreed.md`, round 2). Moving to Phase 2 implementation.
+- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — implemented on `feature/story-002-google-oauth` per `story-002-agreed.md`; PR open targeting `main`, pending Test verification.
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.
 
@@ -99,8 +99,8 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 
 ## Blocked Items
 
-_None. STORY-002's design is agreed on `feature/story-002-google-oauth` (`story-002-agreed.md`).
-Dev implementation starting next._
+_None. STORY-002 is implemented on `feature/story-002-google-oauth` with PR open targeting `main`,
+awaiting Test verification._
 
 ---
 

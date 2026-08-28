@@ -20,8 +20,11 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash")
     private String passwordHash;
+
+    @Column(name = "google_id", unique = true)
+    private String googleId;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -35,6 +38,17 @@ public class User {
         this.createdAt = Instant.now();
     }
 
+    private User(String email, String passwordHash, String googleId) {
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.googleId = googleId;
+        this.createdAt = Instant.now();
+    }
+
+    public static User googleUser(String email, String googleId) {
+        return new User(email, null, googleId);
+    }
+
     public Long getId() {
         return id;
     }
@@ -45,6 +59,10 @@ public class User {
 
     public String getPasswordHash() {
         return passwordHash;
+    }
+
+    public String getGoogleId() {
+        return googleId;
     }
 
     public Instant getCreatedAt() {

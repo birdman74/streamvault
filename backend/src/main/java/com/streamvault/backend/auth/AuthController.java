@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.streamvault.backend.auth.dto.AuthResponse;
+import com.streamvault.backend.auth.dto.GoogleSignInRequest;
 import com.streamvault.backend.auth.dto.LoginRequest;
 import com.streamvault.backend.auth.dto.RegisterRequest;
 import com.streamvault.backend.auth.dto.RegisterResponse;
@@ -21,9 +22,11 @@ import jakarta.validation.Valid;
 public class AuthController {
 
     private final AuthService authService;
+    private final GoogleAuthService googleAuthService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, GoogleAuthService googleAuthService) {
         this.authService = authService;
+        this.googleAuthService = googleAuthService;
     }
 
     @PostMapping("/register")
@@ -35,6 +38,11 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<AuthResponse> google(@Valid @RequestBody GoogleSignInRequest request) {
+        return ResponseEntity.ok(googleAuthService.googleSignIn(request));
     }
 
     @GetMapping("/me")

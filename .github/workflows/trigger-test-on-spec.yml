@@ -5,6 +5,14 @@ on:
     branches: [main]
     paths:
       - 'docs/specs/story-*.md'
+  workflow_dispatch:
+    inputs:
+      story_id:
+        description: 'Story ID (e.g. story-002)'
+        required: true
+      story_file:
+        description: 'Story spec file path (e.g. docs/specs/story-002-google-oauth.md)'
+        required: true
 
 jobs:
   trigger-test:
@@ -20,13 +28,20 @@ jobs:
       - name: Identify new story file
         id: story
         run: |
-          STORY_FILE=$(echo '${{ toJson(github.event.commits) }}' | \
-            grep -oP 'docs/specs/story-\d+[^"]*\.md' | head -1)
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            STORY_FILE="${{ github.event.inputs.story_file }}"
+            STORY_ID="${{ github.event.inputs.story_id }}"
+          else
+            STORY_FILE=$(echo '${{ toJson(github.event.commits) }}' | \
+              jq -r '.[].modified[], .[].added[] | select(test("docs/specs/story-[0-9]+-.*\\.md"))' 2>/dev/null | head -1)
+            STORY_ID=$(echo "$STORY_FILE" | grep -oP 'story-\d+')
+          fi
+
           if [ -z "$STORY_FILE" ]; then
-            echo "No story file found in this push — skipping."
+            echo "No story file found — skipping."
             exit 0
           fi
-          STORY_ID=$(echo "$STORY_FILE" | grep -oP 'story-\d+')
+
           echo "story_file=$STORY_FILE" >> $GITHUB_OUTPUT
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "Detected story: $STORY_ID from $STORY_FILE"

@@ -6,6 +6,18 @@ on:
     paths:
       - 'docs/specs/design/story-*-test-plan.md'
       - 'docs/specs/design/story-*-test-revision-r*.md'
+  workflow_dispatch:
+    inputs:
+      story_id:
+        description: 'Story ID (e.g. story-002)'
+        required: true
+      feature_branch:
+        description: 'Feature branch name (e.g. feature/story-002-google-oauth)'
+        required: true
+      review_round:
+        description: 'Review round number (1, 2, or 3)'
+        required: true
+        default: '1'
 
 jobs:
   trigger-dev-review:
@@ -21,18 +33,22 @@ jobs:
       - name: Identify story and round
         id: context
         run: |
-          CHANGED=$(echo '${{ toJson(github.event.commits) }}' | \
-            grep -oP 'docs/specs/design/story-\d+[^"]*\.md' | head -1)
-          STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
-          BRANCH="${{ github.ref_name }}"
-
-          # Determine current round from existing feedback files
-          ROUND=1
-          for i in 1 2 3; do
-            if [ -f "docs/specs/design/${STORY_ID}-dev-feedback-r${i}.md" ]; then
-              ROUND=$((i + 1))
-            fi
-          done
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            STORY_ID="${{ github.event.inputs.story_id }}"
+            BRANCH="${{ github.event.inputs.feature_branch }}"
+            ROUND="${{ github.event.inputs.review_round }}"
+          else
+            CHANGED=$(echo '${{ toJson(github.event.commits) }}' | \
+              jq -r '.[].modified[], .[].added[] | select(test("docs/specs/design/story-[0-9]+-.*\\.md"))' 2>/dev/null | head -1)
+            STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
+            BRANCH="${{ github.ref_name }}"
+            ROUND=1
+            for i in 1 2 3; do
+              if [ -f "docs/specs/design/${STORY_ID}-dev-feedback-r${i}.md" ]; then
+                ROUND=$((i + 1))
+              fi
+            done
+          fi
 
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "round=$ROUND" >> $GITHUB_OUTPUT

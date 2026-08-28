@@ -20,7 +20,8 @@ jobs:
       - name: Identify story and round
         id: context
         run: |
-          CHANGED=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/design/' | head -1)
+          CHANGED=$(echo '${{ toJson(github.event.commits) }}' | \
+            grep -oP 'docs/specs/design/story-\d+[^"]*\.md' | head -1)
           STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
           ROUND=$(echo "$CHANGED" | grep -oP 'r\d+' | grep -oP '\d+')
           BRANCH="${{ github.ref_name }}"
@@ -35,4 +36,5 @@ jobs:
           REVISION_ROUND: ${{ steps.context.outputs.round }}
           FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
         run: |
-          /home/brian/bin/streamvault-test-auto.sh "Dev has committed feedback file docs/specs/design/${STORY_ID}-dev-feedback-r${REVISION_ROUND}.md on branch ${FEATURE_BRANCH}. Read Dev's concerns carefully and execute your revision phase per your CLAUDE.md: revise the test plan and contracts where Dev's feedback is technically valid without dropping AC coverage, then commit ${STORY_ID}-test-revision-r${REVISION_ROUND}.md."
+          echo "Launching Test persona for $STORY_ID revision round $REVISION_ROUND..."
+          /home/brian/bin/streamvault-test-auto.sh "Dev has committed feedback file docs/specs/design/$STORY_ID-dev-feedback-r${REVISION_ROUND}.md on branch $FEATURE_BRANCH. Read Dev's concerns carefully and execute your revision phase per your CLAUDE.md: revise the test plan and contracts where Dev's feedback is technically valid without dropping AC coverage, then commit $STORY_ID-test-revision-r${REVISION_ROUND}.md and push to origin/$FEATURE_BRANCH."

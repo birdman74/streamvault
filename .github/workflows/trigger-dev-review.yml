@@ -21,7 +21,8 @@ jobs:
       - name: Identify story and round
         id: context
         run: |
-          CHANGED=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/design/' | head -1)
+          CHANGED=$(echo '${{ toJson(github.event.commits) }}' | \
+            grep -oP 'docs/specs/design/story-\d+[^"]*\.md' | head -1)
           STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
           BRANCH="${{ github.ref_name }}"
 
@@ -70,4 +71,5 @@ jobs:
           REVIEW_ROUND: ${{ steps.context.outputs.round }}
           FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
         run: |
-          /home/brian/bin/streamvault-dev-auto.sh "Test has committed a design artifact to feature branch ${FEATURE_BRANCH} for ${STORY_ID}. This is review round ${REVIEW_ROUND}. Read docs/specs/design/${STORY_ID}-test-plan.md and all revision files up to this round. Execute your design review phase per your CLAUDE.md: either commit ${STORY_ID}-agreed.md if you accept the design, or commit ${STORY_ID}-dev-feedback-r${REVIEW_ROUND}.md with specific actionable concerns."
+          echo "Launching Dev persona for $STORY_ID review round $REVIEW_ROUND..."
+          /home/brian/bin/streamvault-dev-auto.sh "Test has committed a design artifact to feature branch $FEATURE_BRANCH for $STORY_ID. This is review round $REVIEW_ROUND. Read docs/specs/design/$STORY_ID-test-plan.md and all revision files up to this round. Execute your design review phase per your CLAUDE.md: either commit $STORY_ID-agreed.md if you accept the design, or commit $STORY_ID-dev-feedback-r${REVIEW_ROUND}.md with specific actionable concerns. Commit and push to origin/$FEATURE_BRANCH."

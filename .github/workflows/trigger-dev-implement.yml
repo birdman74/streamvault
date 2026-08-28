@@ -20,7 +20,8 @@ jobs:
       - name: Identify story
         id: context
         run: |
-          CHANGED=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/design/' | head -1)
+          CHANGED=$(echo '${{ toJson(github.event.commits) }}' | \
+            grep -oP 'docs/specs/design/story-\d+[^"]*\.md' | head -1)
           STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
           BRANCH="${{ github.ref_name }}"
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
@@ -32,4 +33,5 @@ jobs:
           STORY_ID: ${{ steps.context.outputs.story_id }}
           FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
         run: |
-          /home/brian/bin/streamvault-dev-auto.sh "Design agreement has been reached for ${STORY_ID} on branch ${FEATURE_BRANCH}. Read docs/specs/design/${STORY_ID}-agreed.md and execute your implementation phase per your CLAUDE.md: write failing unit tests first, implement until all tests pass including Test's failing tests, then open a PR as the bot account targeting main."
+          echo "Launching Dev persona to implement $STORY_ID..."
+          /home/brian/bin/streamvault-dev-auto.sh "Design agreement has been reached for $STORY_ID on branch $FEATURE_BRANCH. Read docs/specs/design/$STORY_ID-agreed.md and execute your implementation phase per your CLAUDE.md: write failing unit tests first, implement until all tests pass including Test's failing tests, commit the implementation, push to origin/$FEATURE_BRANCH, then open a PR as the bot account targeting main."

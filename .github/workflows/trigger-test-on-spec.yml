@@ -20,12 +20,13 @@ jobs:
       - name: Identify new story file
         id: story
         run: |
-          STORY_FILE=$(git diff-tree --no-commit-id -r --name-only ${{ github.sha }} | grep 'docs/specs/story-.*\.md' | head -1)
+          STORY_FILE=$(echo '${{ toJson(github.event.commits) }}' | \
+            grep -oP 'docs/specs/story-\d+[^"]*\.md' | head -1)
           if [ -z "$STORY_FILE" ]; then
-            echo "No story file found in this commit — skipping."
+            echo "No story file found in this push — skipping."
             exit 0
           fi
-          STORY_ID=$(basename "$STORY_FILE" .md | grep -oP 'story-\d+')
+          STORY_ID=$(echo "$STORY_FILE" | grep -oP 'story-\d+')
           echo "story_file=$STORY_FILE" >> $GITHUB_OUTPUT
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "Detected story: $STORY_ID from $STORY_FILE"
@@ -34,5 +35,7 @@ jobs:
         if: steps.story.outputs.story_id != ''
         env:
           STORY_ID: ${{ steps.story.outputs.story_id }}
+          STORY_FILE: ${{ steps.story.outputs.story_file }}
         run: |
-          /home/brian/bin/streamvault-test-auto.sh "A new user story has been committed to docs/specs/. Read the story file docs/specs/ for ${STORY_ID} and execute Phase 1 of your workflow: create the feature branch feature/${STORY_ID}-<short-description>, write the test plan, define API contracts, write failing automated tests, and commit all artifacts to the feature branch per your CLAUDE.md instructions."
+          echo "Launching Test persona for $STORY_ID..."
+          /home/brian/bin/streamvault-test-auto.sh "A new user story has been committed to docs/specs/. Read the story file $STORY_FILE and execute Phase 1 of your workflow: create the feature branch feature/${STORY_ID}-short-kebab-case-description, write the test plan, define API contracts, write failing automated tests, commit all artifacts to the feature branch, and push the branch to origin — per your CLAUDE.md instructions."

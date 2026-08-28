@@ -22,10 +22,10 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 
 ### Current Phase
 Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) design review
-round 1 complete: Dev requested revisions (emailVerified trust-boundary gap, @Transactional scope
-around the Google network call). Test's round 1 revision committed, accepting both concerns:
-resolution order now checks `emailVerified` before any repository lookup, and `@Transactional` is
-dropped from `googleSignIn()`. Awaiting Dev's confirmation and, if agreed, `story-002-agreed.md`.
+complete after round 1: Dev's two round 1 concerns (emailVerified trust-boundary gap,
+@Transactional scope around the Google network call) were both accepted by Test in
+`story-002-test-revision-r1.md`. Dev reviewed the revised design in round 2 and found no further
+issues; `story-002-agreed.md` committed. Implementation phase starting next.
 
 ---
 
@@ -83,7 +83,7 @@ dropped from `googleSignIn()`. Awaiting Dev's confirmation and, if agreed, `stor
 Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open questions resolved by Brian 2026-08-11)
 
 - [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — merged to main 2026-08-15
-- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — Phase 2 (design iteration) in progress on `feature/story-002-google-oauth`: Dev round 1 feedback addressed in Test's round 1 revision (`story-002-test-revision-r1.md`). Awaiting Dev confirmation.
+- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — design agreed on `feature/story-002-google-oauth` (`story-002-agreed.md`, round 2). Moving to Phase 2 implementation.
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.
 
@@ -99,9 +99,8 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 
 ## Blocked Items
 
-_None. STORY-002's round 1 design iteration is in progress on `feature/story-002-google-oauth`:
-Test has responded to Dev's round 1 feedback with `story-002-test-revision-r1.md`, awaiting Dev's
-confirmation to proceed to implementation._
+_None. STORY-002's design is agreed on `feature/story-002-google-oauth` (`story-002-agreed.md`).
+Dev implementation starting next._
 
 ---
 

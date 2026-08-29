@@ -18,14 +18,18 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-08-28
+2026-08-29
 
 ### Current Phase
-Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) implementation
-verified: Test persona pulled `feature/story-002-google-oauth` (PR #4), ran `mvn clean verify`
-(40 tests, 0 failures, 0 errors), and confirmed all 6 ACs are covered by passing deterministic
-tests, including the AC-6 error message matching the story text exactly. Test Run Summary posted
-to PR #4 with recommendation APPROVED. PR open targeting `main`, awaiting Brian's review and merge.
+Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) PR #4: Brian
+posted Changes Requested, flagging that the nullable `password_hash` column (User.java:23) has no
+application- or database-level enforcement stopping a local (non-Google) account from ending up
+with a null password hash. Test persona wrote 3 new failing tests covering the gap
+(`UserTest.should_throwIllegalArgumentException_when_localAccountConstructedWithNullPasswordHash`,
+`...WithBlankPasswordHash`, and `UserTableConstraintsTest.should_rejectRow_when_bothPasswordHashAndGoogleIdAreNull`,
+plus two passing regression guards confirming a plain NOT NULL constraint would wrongly break
+Google-only accounts) and confirmed via `mvn clean verify` that only these 3 fail (45 tests total,
+42 pass, 0 regressions). Formal Changes Requested review submitted on PR #4 for Dev to address.
 
 ---
 
@@ -83,7 +87,7 @@ to PR #4 with recommendation APPROVED. PR open targeting `main`, awaiting Brian'
 Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open questions resolved by Brian 2026-08-11)
 
 - [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — merged to main 2026-08-15
-- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — implemented on `feature/story-002-google-oauth` per `story-002-agreed.md`; Test-verified (all 6 ACs passing, APPROVED), PR #4 open targeting `main`, pending Brian's review and merge.
+- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — implemented on `feature/story-002-google-oauth` per `story-002-agreed.md`; PR #4 CHANGES REQUESTED by Brian (nullable password_hash lacks enforcement against local accounts with a null password hash); Test wrote 3 failing tests covering the gap and requested changes, awaiting Dev fix.
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.
 
@@ -99,8 +103,12 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 
 ## Blocked Items
 
-_None. STORY-002 is implemented and Test-verified on `feature/story-002-google-oauth`, PR #4 open
-targeting `main`, awaiting Brian's review and merge._
+STORY-002 PR #4 is CHANGES REQUESTED: `password_hash` is nullable (needed for Google-linked
+users) but nothing enforces that a local (non-Google) account always has one, at either the
+application or database layer. Test has written failing tests specifying the required behavior
+(`UserTest`, `UserTableConstraintsTest` in `backend/src/test/java/com/streamvault/backend/user/`);
+unblocks once Dev adds the application-level guard and the database-level constraint and both
+suites go green.
 
 ---
 

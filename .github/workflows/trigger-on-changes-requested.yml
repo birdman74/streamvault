@@ -1,0 +1,71 @@
+name: Trigger Persona — PR Changes Requested
+
+on:
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      reviewer:
+        description: 'Who submitted the Changes Requested review (birdman74 or briankcampbell-streamvault-bot)'
+        required: true
+      story_id:
+        description: 'Story ID (e.g. story-002)'
+        required: true
+      feature_branch:
+        description: 'Feature branch name (e.g. feature/story-002-google-oauth)'
+        required: true
+      pr_number:
+        description: 'Pull request number'
+        required: true
+
+jobs:
+  route-changes-requested:
+    runs-on: self-hosted
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.review.state == 'changes_requested'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Identify reviewer and story context
+        id: context
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            REVIEWER="${{ github.event.inputs.reviewer }}"
+            STORY_ID="${{ github.event.inputs.story_id }}"
+            BRANCH="${{ github.event.inputs.feature_branch }}"
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+          else
+            REVIEWER="${{ github.event.review.user.login }}"
+            BRANCH="${{ github.event.pull_request.head.ref }}"
+            STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          fi
+
+          echo "reviewer=$REVIEWER" >> $GITHUB_OUTPUT
+          echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "Changes Requested by $REVIEWER on $STORY_ID PR #$PR_NUMBER"
+
+      - name: Trigger Test (Brian requested changes)
+        if: steps.context.outputs.reviewer == 'birdman74'
+        env:
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+        run: |
+          echo "Brian requested changes — waking Test for Phase 4..."
+          /home/brian/bin/streamvault-test-auto.sh "Brian has posted a Changes Requested review on PR #$PR_NUMBER for $STORY_ID on branch $FEATURE_BRANCH. Read Brian's review comments on the PR carefully. Execute Phase 4 of your workflow per your CLAUDE.md: write new failing tests that explicitly cover the gap Brian identified, commit them to the feature branch, push to origin/$FEATURE_BRANCH, then submit a formal Changes Requested review via gh pr review so Dev is triggered to fix the implementation."
+
+      - name: Trigger Dev (Test requested changes)
+        if: steps.context.outputs.reviewer == 'briankcampbell-streamvault-bot'
+        env:
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+        run: |
+          echo "Test requested changes — waking Dev for Phase 3 fix..."
+          /home/brian/bin/streamvault-dev-auto.sh "Test has submitted a Changes Requested review on PR #$PR_NUMBER for $STORY_ID on branch $FEATURE_BRANCH. Read Test's review comments carefully — they describe a gap and reference new failing tests Test has added to the branch. Execute Phase 3 of your workflow per your CLAUDE.md: pull the latest branch, fix the implementation until all tests pass including Test's new failing tests, run mvn clean verify to confirm, commit the fix, and push to origin/$FEATURE_BRANCH."

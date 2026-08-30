@@ -1,0 +1,90 @@
+name: Trigger Test — Dev Pushed Fix to Open PR
+
+on:
+  push:
+    branches: ['feature/story-*']
+  workflow_dispatch:
+    inputs:
+      story_id:
+        description: 'Story ID (e.g. story-002)'
+        required: true
+      feature_branch:
+        description: 'Feature branch name (e.g. feature/story-002-google-oauth)'
+        required: true
+      pr_number:
+        description: 'Pull request number'
+        required: true
+
+jobs:
+  trigger-test-on-dev-fix:
+    runs-on: self-hosted
+    if: github.actor == 'briankcampbell-streamvault-bot' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Identify commit author and context
+        id: context
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            STORY_ID="${{ github.event.inputs.story_id }}"
+            BRANCH="${{ github.event.inputs.feature_branch }}"
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+            COMMIT_AUTHOR="claude-streamvault-dev"
+          else
+            COMMIT_AUTHOR=$(echo '${{ toJson(github.event.commits) }}' | \
+              jq -r '.[0].author.name' 2>/dev/null)
+            BRANCH="${{ github.ref_name }}"
+            STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
+            PR_NUMBER=""
+          fi
+
+          echo "commit_author=$COMMIT_AUTHOR" >> $GITHUB_OUTPUT
+          echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "Commit author: $COMMIT_AUTHOR, Story: $STORY_ID, Branch: $BRANCH"
+
+      - name: Check commit author is Dev persona
+        id: author_check
+        run: |
+          if [ "${{ steps.context.outputs.commit_author }}" == "claude-streamvault-dev" ]; then
+            echo "is_dev=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_dev=false" >> $GITHUB_OUTPUT
+            echo "Commit author is not claude-streamvault-dev — skipping."
+          fi
+
+      - name: Check open PR exists for this branch
+        id: pr_check
+        if: steps.author_check.outputs.is_dev == 'true' && github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+        run: |
+          PR_DATA=$(gh pr list --head "$BRANCH" --state open --json number 2>/dev/null)
+          PR_NUMBER=$(echo "$PR_DATA" | jq -r '.[0].number // empty')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open PR found for branch $BRANCH — this is a Phase 2 implementation push before PR exists. Skipping."
+            echo "has_open_pr=false" >> $GITHUB_OUTPUT
+          else
+            echo "Open PR #$PR_NUMBER found — this is a fix commit on an existing PR."
+            echo "has_open_pr=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Launch Test persona for re-verification
+        if: |
+          steps.author_check.outputs.is_dev == 'true' &&
+          (github.event_name == 'workflow_dispatch' || steps.pr_check.outputs.has_open_pr == 'true')
+        env:
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number || steps.pr_check.outputs.pr_number }}
+        run: |
+          echo "Dev pushed a fix to open PR — waking Test for re-verification..."
+          /home/brian/bin/streamvault-test-auto.sh "Dev has pushed a fix to branch $FEATURE_BRANCH for $STORY_ID on PR #$PR_NUMBER. Execute Phase 3 of your workflow per your CLAUDE.md: pull the latest branch, run the full test suite, verify every AC-N criterion and invariant is covered by a passing test, write any additional regression tests needed, post an updated PR comment with the test run summary, and submit a formal gh pr review --approve or --request-changes."

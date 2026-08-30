@@ -21,15 +21,14 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 2026-08-30
 
 ### Current Phase
-Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) PR #4: Dev
-addressed Brian's Changes Requested review (nullable `password_hash` had no application- or
-database-level enforcement against local accounts with a null password hash). Fix: `User`'s
-public two-arg constructor now throws `IllegalArgumentException` on a null/blank `passwordHash`,
-and Flyway migration `V3__add_users_password_or_google_check.sql` adds a
-`CHECK (password_hash IS NOT NULL OR google_id IS NOT NULL)` constraint at the database level.
-`mvn clean verify` confirms all 45 tests pass (42 pre-existing + Test's 3 new failing tests, now
-green), 0 regressions. Pushed to `feature/story-002-google-oauth`; PR #4 updates automatically,
-awaiting Test re-verification.
+Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) PR #4:
+Test re-verified Dev's fix for Brian's Changes Requested gap (nullable `password_hash` lacking
+enforcement against local accounts). `mvn clean verify` confirms all 45 tests pass, 0 failures,
+0 errors, including the 3 previously-failing tests (`UserTest` x2, `UserTableConstraintsTest`)
+now green. All 6 ACs and all cross-story invariants (JWT claims/expiry, repository empty-result
+handling, nullable-security-column enforcement) remain covered by passing tests. Regression
+analysis of `SecurityConfig`, `User`, and the V2/V3 migrations found no impact to STORY-001's
+existing auth flows. Formal APPROVE review submitted on PR #4; awaiting Brian's merge.
 
 ---
 
@@ -87,7 +86,7 @@ awaiting Test re-verification.
 Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open questions resolved by Brian 2026-08-11)
 
 - [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — merged to main 2026-08-15
-- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — implemented on `feature/story-002-google-oauth` per `story-002-agreed.md`; PR #4 CHANGES REQUESTED by Brian (nullable password_hash lacks enforcement against local accounts with a null password hash); Dev fixed with an application-level guard in `User`'s constructor and a new database-level CHECK constraint (`V3__add_users_password_or_google_check.sql`); all 45 tests green, pushed to branch, awaiting Test re-verification.
+- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — implemented on `feature/story-002-google-oauth` per `story-002-agreed.md`; PR #4 CHANGES REQUESTED by Brian (nullable password_hash lacks enforcement against local accounts with a null password hash) was fixed by Dev (application-level guard in `User`'s constructor + database-level CHECK constraint via `V3__add_users_password_or_google_check.sql`); Test re-verified all 45 tests pass with no regressions and submitted a formal APPROVE review on PR #4; awaiting Brian's merge.
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.
 
@@ -104,8 +103,8 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 ## Blocked Items
 
 None currently. STORY-002 PR #4's Changes Requested gap (nullable `password_hash` lacking
-enforcement against local accounts) has been fixed by Dev; awaiting Test's re-verification and
-Brian's re-review before merge.
+enforcement against local accounts) has been fixed by Dev and re-verified by Test (APPROVED);
+awaiting Brian's merge.
 
 ---
 

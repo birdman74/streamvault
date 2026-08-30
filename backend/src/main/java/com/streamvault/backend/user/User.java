@@ -33,6 +33,9 @@ public class User {
     }
 
     public User(String email, String passwordHash) {
+        if (passwordHash == null || passwordHash.isBlank()) {
+            throw new IllegalArgumentException("passwordHash must not be null or blank for a local account");
+        }
         this.email = email;
         this.passwordHash = passwordHash;
         this.createdAt = Instant.now();

@@ -18,18 +18,18 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-08-29
+2026-08-30
 
 ### Current Phase
-Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) PR #4: Brian
-posted Changes Requested, flagging that the nullable `password_hash` column (User.java:23) has no
-application- or database-level enforcement stopping a local (non-Google) account from ending up
-with a null password hash. Test persona wrote 3 new failing tests covering the gap
-(`UserTest.should_throwIllegalArgumentException_when_localAccountConstructedWithNullPasswordHash`,
-`...WithBlankPasswordHash`, and `UserTableConstraintsTest.should_rejectRow_when_bothPasswordHashAndGoogleIdAreNull`,
-plus two passing regression guards confirming a plain NOT NULL constraint would wrongly break
-Google-only accounts) and confirmed via `mvn clean verify` that only these 3 fail (45 tests total,
-42 pass, 0 regressions). Formal Changes Requested review submitted on PR #4 for Dev to address.
+Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) PR #4: Dev
+addressed Brian's Changes Requested review (nullable `password_hash` had no application- or
+database-level enforcement against local accounts with a null password hash). Fix: `User`'s
+public two-arg constructor now throws `IllegalArgumentException` on a null/blank `passwordHash`,
+and Flyway migration `V3__add_users_password_or_google_check.sql` adds a
+`CHECK (password_hash IS NOT NULL OR google_id IS NOT NULL)` constraint at the database level.
+`mvn clean verify` confirms all 45 tests pass (42 pre-existing + Test's 3 new failing tests, now
+green), 0 regressions. Pushed to `feature/story-002-google-oauth`; PR #4 updates automatically,
+awaiting Test re-verification.
 
 ---
 
@@ -87,7 +87,7 @@ Google-only accounts) and confirmed via `mvn clean verify` that only these 3 fai
 Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open questions resolved by Brian 2026-08-11)
 
 - [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — merged to main 2026-08-15
-- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — implemented on `feature/story-002-google-oauth` per `story-002-agreed.md`; PR #4 CHANGES REQUESTED by Brian (nullable password_hash lacks enforcement against local accounts with a null password hash); Test wrote 3 failing tests covering the gap and requested changes, awaiting Dev fix.
+- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — implemented on `feature/story-002-google-oauth` per `story-002-agreed.md`; PR #4 CHANGES REQUESTED by Brian (nullable password_hash lacks enforcement against local accounts with a null password hash); Dev fixed with an application-level guard in `User`'s constructor and a new database-level CHECK constraint (`V3__add_users_password_or_google_check.sql`); all 45 tests green, pushed to branch, awaiting Test re-verification.
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.
 
@@ -103,12 +103,9 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 
 ## Blocked Items
 
-STORY-002 PR #4 is CHANGES REQUESTED: `password_hash` is nullable (needed for Google-linked
-users) but nothing enforces that a local (non-Google) account always has one, at either the
-application or database layer. Test has written failing tests specifying the required behavior
-(`UserTest`, `UserTableConstraintsTest` in `backend/src/test/java/com/streamvault/backend/user/`);
-unblocks once Dev adds the application-level guard and the database-level constraint and both
-suites go green.
+None currently. STORY-002 PR #4's Changes Requested gap (nullable `password_hash` lacking
+enforcement against local accounts) has been fixed by Dev; awaiting Test's re-verification and
+Brian's re-review before merge.
 
 ---
 

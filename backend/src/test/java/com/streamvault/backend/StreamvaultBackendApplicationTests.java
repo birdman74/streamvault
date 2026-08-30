@@ -16,6 +16,7 @@ class StreamvaultBackendApplicationTests {
         registry.add("spring.datasource.password", () -> "");
         registry.add("app.jwt.secret", () -> "test-secret-key-that-is-at-least-32-bytes-long");
         registry.add("app.jwt.expiration-ms", () -> "86400000");
+        registry.add("app.google.client-id", () -> "test-client-id.apps.googleusercontent.com");
     }
 
     @Test

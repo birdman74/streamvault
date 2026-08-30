@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.streamvault.backend.auth.exception.EmailAlreadyRegisteredException;
+import com.streamvault.backend.auth.exception.GoogleAccountEmailCollisionException;
+import com.streamvault.backend.auth.exception.GoogleSignInException;
 import com.streamvault.backend.auth.exception.InvalidCredentialsException;
 
 @RestControllerAdvice
@@ -44,6 +46,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleInvalidCredentials() {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(Map.of("error", "Invalid email or password"));
+    }
+
+    @ExceptionHandler(GoogleSignInException.class)
+    public ResponseEntity<Map<String, String>> handleGoogleSignIn() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("error", "Google sign-in failed. Please try again."));
+    }
+
+    @ExceptionHandler(GoogleAccountEmailCollisionException.class)
+    public ResponseEntity<Map<String, String>> handleGoogleAccountEmailCollision() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", "An account with this email already exists. Please sign in with your password."));
     }
 
     @ExceptionHandler(Exception.class)

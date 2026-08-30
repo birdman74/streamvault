@@ -1,0 +1,103 @@
+name: Trigger Dev — Test Committed Failing Tests After Changes Requested
+
+on:
+  push:
+    branches: ['feature/story-*']
+    paths:
+      - 'src/test/**'
+  workflow_dispatch:
+    inputs:
+      story_id:
+        description: 'Story ID (e.g. story-002)'
+        required: true
+      feature_branch:
+        description: 'Feature branch name (e.g. feature/story-002-google-oauth)'
+        required: true
+      pr_number:
+        description: 'Pull request number'
+        required: true
+
+jobs:
+  trigger-dev-on-test-commit:
+    runs-on: self-hosted
+    if: github.actor == 'briankcampbell-streamvault-bot' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Identify commit author and context
+        id: context
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            STORY_ID="${{ github.event.inputs.story_id }}"
+            BRANCH="${{ github.event.inputs.feature_branch }}"
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+            COMMIT_AUTHOR="claude-streamvault-test"
+          else
+            COMMIT_AUTHOR=$(echo '${{ toJson(github.event.commits) }}' | \
+              jq -r '.[0].author.name' 2>/dev/null)
+            BRANCH="${{ github.ref_name }}"
+            STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
+            PR_NUMBER=""
+          fi
+
+          echo "commit_author=$COMMIT_AUTHOR" >> $GITHUB_OUTPUT
+          echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "Commit author: $COMMIT_AUTHOR, Story: $STORY_ID, Branch: $BRANCH"
+
+      - name: Check commit author is Test persona
+        id: author_check
+        run: |
+          if [ "${{ steps.context.outputs.commit_author }}" == "claude-streamvault-test" ]; then
+            echo "is_test=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_test=false" >> $GITHUB_OUTPUT
+            echo "Commit author is not claude-streamvault-test — skipping."
+          fi
+
+      - name: Check PR is in changes_requested state
+        id: pr_check
+        if: steps.author_check.outputs.is_test == 'true' && github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+        run: |
+          # Find open PR for this branch and check if it has changes_requested reviews
+          PR_DATA=$(gh pr list --head "$BRANCH" --state open --json number,reviews 2>/dev/null)
+          PR_NUMBER=$(echo "$PR_DATA" | jq -r '.[0].number // empty')
+          
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open PR found for branch $BRANCH — this is a Phase 1 test commit, not a feedback loop commit. Skipping."
+            echo "has_changes_requested=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          HAS_CHANGES_REQUESTED=$(echo "$PR_DATA" | \
+            jq -r '.[0].reviews[] | select(.state == "CHANGES_REQUESTED") | .state' | head -1)
+
+          if [ -n "$HAS_CHANGES_REQUESTED" ]; then
+            echo "PR #$PR_NUMBER has changes_requested reviews — this is a feedback loop commit."
+            echo "has_changes_requested=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          else
+            echo "PR #$PR_NUMBER has no changes_requested reviews — this is a Phase 3 regression test commit. Skipping."
+            echo "has_changes_requested=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Launch Dev persona to fix implementation
+        if: |
+          steps.author_check.outputs.is_test == 'true' && 
+          (github.event_name == 'workflow_dispatch' || steps.pr_check.outputs.has_changes_requested == 'true')
+        env:
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number || steps.pr_check.outputs.pr_number }}
+        run: |
+          echo "Test committed failing tests on PR with changes_requested — waking Dev for Phase 3 fix..."
+          /home/brian/bin/streamvault-dev-auto.sh "Test has committed new failing tests to branch $FEATURE_BRANCH for $STORY_ID in response to a Changes Requested review on PR #$PR_NUMBER. Pull the latest branch, read the new failing tests to understand the gap, fix the implementation until all tests pass including the new failing tests, run mvn clean verify to confirm, commit the fix, and push to origin/$FEATURE_BRANCH. Do not open a new PR — the existing PR updates automatically."

@@ -91,10 +91,8 @@ When Brian posts a Changes Requested review on the PR:
    git commit -m "test(story-NNN): failing tests covering gap identified in Brian's review"
    git push origin feature/story-NNN-short-kebab-case-description
    ```
-5. Submit a formal Changes Requested review using `gh` so Dev is triggered:
-   ```bash
-   gh pr review <PR_NUMBER> --request-changes --body "[describe the gap and reference the new failing tests Dev must make pass]"
-   ```
+
+Pushing new test commits to the feature branch automatically triggers Dev to fix the implementation — do NOT attempt to submit a `gh pr review --request-changes`. GitHub prevents the PR author (the bot account) from reviewing their own PR. The push is the trigger.
 
 ## Cross-Story Invariants to Always Check
 

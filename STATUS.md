@@ -28,7 +28,10 @@ enforcement against local accounts). `mvn clean verify` confirms all 45 tests pa
 now green. All 6 ACs and all cross-story invariants (JWT claims/expiry, repository empty-result
 handling, nullable-security-column enforcement) remain covered by passing tests. Regression
 analysis of `SecurityConfig`, `User`, and the V2/V3 migrations found no impact to STORY-001's
-existing auth flows. Formal APPROVE review submitted on PR #4; awaiting Brian's merge.
+existing auth flows. Posted a Test Run Summary comment recommending APPROVED, but
+`gh pr review --approve` failed: GitHub blocks self-review because all three personas share one
+bot account (`briankcampbell-streamvault-bot`) and that account has a commit on this PR. Formal
+approval could not be submitted via `gh pr review`; flagged to Brian.
 
 ---
 
@@ -86,7 +89,7 @@ existing auth flows. Formal APPROVE review submitted on PR #4; awaiting Brian's 
 Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open questions resolved by Brian 2026-08-11)
 
 - [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — merged to main 2026-08-15
-- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — implemented on `feature/story-002-google-oauth` per `story-002-agreed.md`; PR #4 CHANGES REQUESTED by Brian (nullable password_hash lacks enforcement against local accounts with a null password hash) was fixed by Dev (application-level guard in `User`'s constructor + database-level CHECK constraint via `V3__add_users_password_or_google_check.sql`); Test re-verified all 45 tests pass with no regressions and submitted a formal APPROVE review on PR #4; awaiting Brian's merge.
+- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — implemented on `feature/story-002-google-oauth` per `story-002-agreed.md`; PR #4 CHANGES REQUESTED by Brian (nullable password_hash lacks enforcement against local accounts with a null password hash) was fixed by Dev (application-level guard in `User`'s constructor + database-level CHECK constraint via `V3__add_users_password_or_google_check.sql`); Test re-verified all 45 tests pass with no regressions and posted a Test Run Summary recommending APPROVED, but `gh pr review --approve` is blocked by GitHub's self-review restriction (shared bot account); awaiting Brian's decision on how to record formal approval, then merge.
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.
 
@@ -102,9 +105,13 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 
 ## Blocked Items
 
-None currently. STORY-002 PR #4's Changes Requested gap (nullable `password_hash` lacking
-enforcement against local accounts) has been fixed by Dev and re-verified by Test (APPROVED);
-awaiting Brian's merge.
+STORY-002 PR #4: Dev's fix for the password_hash enforcement gap is re-verified by Test (all 45
+tests pass, no regressions, Test Run Summary posted recommending APPROVED), but Test cannot
+submit a formal `gh pr review --approve` — GitHub rejects it as self-review since all personas
+share one bot GitHub account (`briankcampbell-streamvault-bot`) and that account has a commit on
+this PR. Same root cause previously forced the Dev-feedback-loop trigger to go push-based instead
+of `gh pr review`-based (see `.github/workflows/trigger-test-on-dev-fix.yml`). No workaround
+attempted; needs Brian's decision on how final approval should be recorded going forward.
 
 ---
 

@@ -25,3 +25,4 @@ I can access StreamVault without creating or remembering a separate password
 - Linking/unlinking Google sign-in from an existing email/password account after the fact (see docs/specs/backlog.md)
 - Any other OAuth providers (GitHub, etc.)
 
+## Prerequisites: - story-001

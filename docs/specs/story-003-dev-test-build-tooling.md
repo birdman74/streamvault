@@ -24,3 +24,5 @@ I can validate an implementation against a story's acceptance criteria before co
 ## Out of Scope
 - Testcontainers / any integration test requiring a Docker daemon inside the container (see `docs/specs/backlog.md`)
 - Any change to what Dev or Test are authorized to commit, push, or merge
+
+## Prerequisites: - None

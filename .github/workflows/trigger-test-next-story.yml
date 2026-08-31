@@ -1,0 +1,120 @@
+name: Trigger Test — Next Story from Queue
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/specs/story-*.md'
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      story_id:
+        description: 'Force a specific story ID (leave blank to use queue manager)'
+        required: false
+
+jobs:
+  queue-next-story:
+    runs-on: self-hosted
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (github.actor == 'birdman74' || github.actor == 'briankcampbell-streamvault-bot')) ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Close completed story issue
+        if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
+
+          if [ -z "$STORY_ID" ]; then
+            echo "Could not extract story ID from branch $BRANCH — skipping issue close."
+            exit 0
+          fi
+
+          # Find and close the issue for this story, remove in-progress label
+          ISSUE_NUMBER=$(gh issue list \
+            --label "story" \
+            --state open \
+            --json number,title \
+            --jq ".[] | select(.title | test(\"$STORY_ID\")) | .number" 2>/dev/null)
+
+          if [ -n "$ISSUE_NUMBER" ]; then
+            gh issue edit "$ISSUE_NUMBER" --remove-label "in-progress"
+            gh issue close "$ISSUE_NUMBER" --comment "Completed — PR merged to main."
+            echo "Closed issue #$ISSUE_NUMBER for $STORY_ID"
+          else
+            echo "No open issue found for $STORY_ID — may have already been closed."
+          fi
+
+      - name: Determine next story
+        id: queue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.story_id }}" ]; then
+            NEXT_STORY="${{ github.event.inputs.story_id }}"
+            echo "Manual override — using story: $NEXT_STORY"
+            echo "next_story=$NEXT_STORY" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          chmod +x scripts/next-story.sh
+          NEXT_STORY=$(./scripts/next-story.sh)
+          EXIT_CODE=$?
+
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "Queue manager error — a story may already be in-progress."
+            exit 1
+          fi
+
+          if [ -z "$NEXT_STORY" ]; then
+            echo "No eligible story found in queue — nothing to start."
+            echo "next_story=" >> $GITHUB_OUTPUT
+          else
+            echo "Next eligible story: $NEXT_STORY"
+            echo "next_story=$NEXT_STORY" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Mark next story as in-progress
+        if: steps.queue.outputs.next_story != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          STORY_ID="${{ steps.queue.outputs.next_story }}"
+
+          ISSUE_NUMBER=$(gh issue list \
+            --label "story" \
+            --state open \
+            --json number,title \
+            --jq ".[] | select(.title | test(\"$STORY_ID\")) | .number" 2>/dev/null)
+
+          if [ -n "$ISSUE_NUMBER" ]; then
+            gh issue edit "$ISSUE_NUMBER" --add-label "in-progress"
+            echo "Marked issue #$ISSUE_NUMBER as in-progress"
+          else
+            echo "WARNING: No open issue found for $STORY_ID"
+          fi
+
+      - name: Find story file path
+        id: story_file
+        if: steps.queue.outputs.next_story != ''
+        run: |
+          STORY_FILE=$(ls docs/specs/${{ steps.queue.outputs.next_story }}-*.md 2>/dev/null | head -1)
+          echo "story_file=$STORY_FILE" >> $GITHUB_OUTPUT
+
+      - name: Launch Test persona for next story
+        if: steps.queue.outputs.next_story != ''
+        env:
+          STORY_ID: ${{ steps.queue.outputs.next_story }}
+          STORY_FILE: ${{ steps.story_file.outputs.story_file }}
+        run: |
+          echo "Launching Test persona for $STORY_ID..."
+          /home/brian/bin/streamvault-test-auto.sh "A new user story is ready to begin. Read the story file $STORY_FILE and execute Phase 1 of your workflow: create the feature branch feature/${STORY_ID}-short-kebab-case-description, write the test plan, define API contracts, write failing automated tests, commit all artifacts to the feature branch, and push the branch to origin — per your CLAUDE.md instructions."

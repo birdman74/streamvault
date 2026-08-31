@@ -27,3 +27,5 @@ implementation and verification work can move from a local commit to a reviewabl
 - GitHub App-based authentication (see `docs/specs/backlog.md` framing above, decided against)
 - Merge capability of any kind, for either persona
 - Any other repo automation not listed above (issue creation, releases, branch protection changes, etc.)
+
+## Prerequisites: - story-003

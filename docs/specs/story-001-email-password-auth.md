@@ -30,3 +30,5 @@ I can securely access my own personal streaming library, separate from every oth
 - Email verification
 - Changing password or deleting account (see docs/specs/backlog.md)
 - Any role or permission beyond "owner of my own data"
+
+## Prerequisites: - None

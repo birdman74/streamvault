@@ -1,8 +1,8 @@
-# StreamVault — Project Status
+# StreamVault - Project Status
 
 > This file is the source of truth for project health and progress.
 > Updated by Brian (infrastructure/review), PO persona (epics/stories), Dev persona (implementation), and Test persona (verification).
-> **Updated as part of every meaningful commit — do not let this file fall behind.**
+> **Updated as part of every meaningful commit - do not let this file fall behind.**
 
 ---
 
@@ -18,20 +18,10 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-08-30
+2026-08-31
 
 ### Current Phase
-Application Development — STORY-001 complete and merged. STORY-002 (Google OAuth2) PR #4:
-Test re-verified Dev's fix for Brian's Changes Requested gap (nullable `password_hash` lacking
-enforcement against local accounts). `mvn clean verify` confirms all 45 tests pass, 0 failures,
-0 errors, including the 3 previously-failing tests (`UserTest` x2, `UserTableConstraintsTest`)
-now green. All 6 ACs and all cross-story invariants (JWT claims/expiry, repository empty-result
-handling, nullable-security-column enforcement) remain covered by passing tests. Regression
-analysis of `SecurityConfig`, `User`, and the V2/V3 migrations found no impact to STORY-001's
-existing auth flows. Posted a Test Run Summary comment recommending APPROVED, but
-`gh pr review --approve` failed: GitHub blocks self-review because all three personas share one
-bot account (`briankcampbell-streamvault-bot`) and that account has a commit on this PR. Formal
-approval could not be submitted via `gh pr review`; flagged to Brian.
+Application Development - STORY-001, STORY-002 complete and merged. Story queue management now in place. Waiting for next story from PO.
 
 ---
 
@@ -47,14 +37,14 @@ approval could not be submitted via `gh pr review`; flagged to Brian.
 - [x] Swap file added to EC2 (2GB, persistent via /etc/fstab)
 - [x] `restart: unless-stopped` added to all compose services
 - [x] PostgreSQL container stable on EC2
-- [x] LiteLLM deferred from EC2 (t3.micro memory constraint — revisit when upgrading instance for production demo)
+- [x] LiteLLM deferred from EC2 (t3.micro memory constraint - revisit when upgrading instance for production demo)
 - [x] Caddy reverse proxy added to compose and responding on port 80/443
 - [x] Split docker-compose.yml (local dev) and docker-compose.prod.yml (EC2)
 - [ ] Domain name pointed at Elastic IP
 
 ### Local Dev Environment
-- [x] Ollama deferred — AMD RX 7600 XT lacks DirectML support in Ollama Docker image on WSL2/Windows; CPU-only inference not performant enough to justify inclusion. Will revisit if Claude Pro API costs become a concern during development.
-- [x] Local LiteLLM deferred alongside Ollama — will revisit when Ollama is unblocked or an alternative local inference path is identified.
+- [x] Ollama deferred - AMD RX 7600 XT lacks DirectML support in Ollama Docker image on WSL2/Windows; CPU-only inference not performant enough to justify inclusion. Will revisit if Claude Pro API costs become a concern during development.
+- [x] Local LiteLLM deferred alongside Ollama - will revisit when Ollama is unblocked or an alternative local inference path is identified.
 - [x] MongoDB Atlas M0 free tier created
 - [x] MongoDB Atlas connection string added to .env (local + EC2)
 
@@ -86,18 +76,18 @@ approval could not be submitted via `gh pr review`; flagged to Brian.
 ## Epics & Stories
 
 ### Epic: User Authentication
-Spec: `docs/specs/epic-user-authentication.md` — READY FOR DEV (all open questions resolved by Brian 2026-08-11)
+Spec: `docs/specs/epic-user-authentication.md` - READY FOR DEV (all open questions resolved by Brian 2026-08-11)
 
-- [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) — merged to main 2026-08-15
-- [ ] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) — implemented on `feature/story-002-google-oauth` per `story-002-agreed.md`; PR #4 CHANGES REQUESTED by Brian (nullable password_hash lacks enforcement against local accounts with a null password hash) was fixed by Dev (application-level guard in `User`'s constructor + database-level CHECK constraint via `V3__add_users_password_or_google_check.sql`); Test re-verified all 45 tests pass with no regressions and posted a Test Run Summary recommending APPROVED, but `gh pr review --approve` is blocked by GitHub's self-review restriction (shared bot account); awaiting Brian's decision on how to record formal approval, then merge.
+- [x] STORY-001: Email/Password Registration and Login (`docs/specs/story-001-email-password-auth.md`) - merged to main 2026-08-15
+- [x] STORY-002: Google OAuth2 Sign-In (`docs/specs/story-002-google-oauth.md`) - merged to main 2026-08-30
 
 Deferred work parked in `docs/specs/backlog.md`: Account Settings, Password Reset & Email Verification, server-side JWT revocation, Google/email account linking.
 
 ### Epic: Autonomous Agentic Workflow
-Spec: `docs/specs/epic-autonomous-agentic-workflow.md` — READY (assignee: Brian, both stories are infrastructure changes to the persona containers themselves, not Dev persona work)
+Spec: `docs/specs/epic-autonomous-agentic-workflow.md` - READY (assignee: Brian, both stories are infrastructure changes to the persona containers themselves, not Dev persona work)
 
-- [x] STORY-003: Local Build & Test Tooling in Dev and Test Containers (`docs/specs/story-003-dev-test-build-tooling.md`) — tackled first
-- [x] STORY-004: GitHub PR Automation for Dev and Test Personas (`docs/specs/story-004-github-pr-automation.md`) — depends on STORY-003
+- [x] STORY-003: Local Build & Test Tooling in Dev and Test Containers (`docs/specs/story-003-dev-test-build-tooling.md`) - tackled first
+- [x] STORY-004: GitHub PR Automation for Dev and Test Personas (`docs/specs/story-004-github-pr-automation.md`) - depends on STORY-003
 
 Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker for Test persona, GitHub App-based auth.
 
@@ -105,13 +95,7 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 
 ## Blocked Items
 
-STORY-002 PR #4: Dev's fix for the password_hash enforcement gap is re-verified by Test (all 45
-tests pass, no regressions, Test Run Summary posted recommending APPROVED), but Test cannot
-submit a formal `gh pr review --approve` — GitHub rejects it as self-review since all personas
-share one bot GitHub account (`briankcampbell-streamvault-bot`) and that account has a commit on
-this PR. Same root cause previously forced the Dev-feedback-loop trigger to go push-based instead
-of `gh pr review`-based (see `.github/workflows/trigger-test-on-dev-fix.yml`). No workaround
-attempted; needs Brian's decision on how final approval should be recorded going forward.
+N/A
 
 ---
 

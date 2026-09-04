@@ -18,10 +18,10 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-08-31
+2026-09-04
 
 ### Current Phase
-Application Development - STORY-001, STORY-002 complete and merged. Story queue management now in place. Waiting for next story from PO.
+Application Development - User Authentication epic complete and merged (STORY-001, STORY-002). Autonomous Agentic Workflow epic complete (STORY-003, STORY-004). Personal Streaming Library epic defined by PO: STORY-005 through STORY-019 specced and queued for Test and Dev.
 
 ---
 
@@ -90,6 +90,27 @@ Spec: `docs/specs/epic-autonomous-agentic-workflow.md` - READY (assignee: Brian,
 - [x] STORY-004: GitHub PR Automation for Dev and Test Personas (`docs/specs/story-004-github-pr-automation.md`) - depends on STORY-003
 
 Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker for Test persona, GitHub App-based auth.
+
+### Epic: Personal Streaming Library
+Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the queue picks up STORY-005
+
+- [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic
+- [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`)
+- [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006
+- [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006
+- [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008
+- [ ] STORY-010: Set Movie Watch Status (`docs/specs/story-010-set-movie-watch-status.md`) - prereq STORY-007
+- [ ] STORY-011: Remove Item from Library (`docs/specs/story-011-remove-library-item.md`) - prereq STORY-007, STORY-008
+- [ ] STORY-012: Series Progress by Episode with Season and Series Roll-Up (`docs/specs/story-012-series-episode-status-rollup.md`) - prereq STORY-008
+- [ ] STORY-013: Set and Clear Watch Dates Across Series Levels (`docs/specs/story-013-watch-dates.md`) - prereq STORY-010, STORY-012
+- [ ] STORY-014: Notes and Review per Library Item (`docs/specs/story-014-notes-review.md`) - prereq STORY-007, STORY-008
+- [ ] STORY-015: Personal Rating per Library Item (`docs/specs/story-015-personal-rating.md`) - prereq STORY-005, STORY-007, STORY-008
+- [ ] STORY-016: Streaming Source per Library Item from a Predefined List (`docs/specs/story-016-streaming-source-predefined.md`) - prereq STORY-007, STORY-008, STORY-009
+- [ ] STORY-017: Custom Streaming Source Entries (`docs/specs/story-017-custom-streaming-source.md`) - prereq STORY-016
+- [ ] STORY-018: Refresh a Series from TMDB to Pick Up New Seasons and Episodes (`docs/specs/story-018-refresh-series-from-tmdb.md`) - prereq STORY-008, STORY-012
+- [ ] STORY-019: Bypass Removal Confirmation Preference (`docs/specs/story-019-bypass-removal-confirmation.md`) - prereq STORY-011
+
+Deferred work parked in `docs/specs/backlog.md`: grouping and collections (own future epic, unlocks group-level watch date clearing), per-season/per-episode notes and ratings, custom metadata and tags (MongoDB entry point), scheduled background series sync, broader Account Settings epic.
 
 ---
 

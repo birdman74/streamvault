@@ -1,0 +1,53 @@
+name: Trigger PO — Brian Requested Changes on Specs PR
+
+on:
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      story_id:
+        description: 'Epic or story reference (e.g. epic-003)'
+        required: true
+      specs_branch:
+        description: 'Specs branch name (e.g. specs/epic-003-core-library)'
+        required: true
+      pr_number:
+        description: 'Pull request number'
+        required: true
+
+jobs:
+  trigger-po-on-changes-requested:
+    runs-on: self-hosted
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.review.state == 'changes_requested' &&
+        github.event.review.user.login == 'birdman74' &&
+        startsWith(github.event.pull_request.head.ref, 'specs/')
+      )
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Identify context
+        id: context
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            BRANCH="${{ github.event.inputs.specs_branch }}"
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+          else
+            BRANCH="${{ github.event.pull_request.head.ref }}"
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          fi
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "Changes requested on specs PR #$PR_NUMBER on branch $BRANCH"
+
+      - name: Launch PO persona to address review
+        env:
+          SPECS_BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+        run: |
+          echo "Waking PO to address Brian's review on PR #$PR_NUMBER..."
+          /home/brian/bin/streamvault-po-auto.sh "Brian has posted a Changes Requested review on specs PR #$PR_NUMBER on branch $SPECS_BRANCH. Read Brian's review comments carefully. Update the affected spec files on the same branch to address his feedback. Update any GitHub Issues whose story scope changed. Commit and push to origin/$SPECS_BRANCH. Do not open a new PR -- the existing one updates automatically."

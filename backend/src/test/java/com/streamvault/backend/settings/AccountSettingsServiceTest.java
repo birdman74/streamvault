@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -86,7 +87,7 @@ class AccountSettingsServiceTest {
         User userA = new User("a@example.com", "hashed-password-a");
         User userB = new User("b@example.com", "hashed-password-b");
         when(userRepository.findById(1L)).thenReturn(Optional.of(userA));
-        when(userRepository.findById(2L)).thenReturn(Optional.of(userB));
+        lenient().when(userRepository.findById(2L)).thenReturn(Optional.of(userB));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         accountSettingsService.updateRatingType(1L, new UpdateAccountSettingsRequest("THUMBS_UP_THUMBS_DOWN"));

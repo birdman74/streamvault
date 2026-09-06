@@ -20,6 +20,12 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 ### Last Updated
 2026-09-06
 
+### STORY-005 Status
+Implementation complete: migration, `RatingType` enum, `User.ratingType`, `settings` package
+(DTOs, `AccountSettingsService`, `AccountSettingsController`), `GlobalExceptionHandler` extension.
+All 67 backend tests pass (`mvn clean verify`). PR open against `main` for Test verification and
+Brian's review.
+
 ### Current Phase
 Application Development - User Authentication epic complete and merged (STORY-001, STORY-002). Autonomous Agentic Workflow epic complete (STORY-003, STORY-004). Personal Streaming Library epic defined by PO: STORY-005 through STORY-019 specced and queued for Test and Dev.
 
@@ -94,7 +100,7 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 ### Epic: Personal Streaming Library
 Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the queue picks up STORY-005
 
-- [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic - Dev design review round 1 complete: agreed on Test's design with no amendments (`docs/specs/design/story-005-agreed.md`), proceeding to implementation
+- [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic - Dev implementation complete, PR open against `main`, awaiting Test verification and Brian's review
 - [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`)
 - [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006

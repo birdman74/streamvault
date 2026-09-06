@@ -4,6 +4,8 @@ import java.time.Instant;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -28,6 +30,10 @@ public class User {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rating_type", nullable = false)
+    private RatingType ratingType = RatingType.LOVE_LIKE_MEH_DISLIKE_HATE;
 
     protected User() {
     }
@@ -70,5 +76,13 @@ public class User {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public RatingType getRatingType() {
+        return ratingType;
+    }
+
+    public void setRatingType(RatingType ratingType) {
+        this.ratingType = ratingType;
     }
 }

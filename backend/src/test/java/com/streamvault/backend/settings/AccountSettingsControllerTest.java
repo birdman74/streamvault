@@ -3,7 +3,6 @@ package com.streamvault.backend.settings;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -11,17 +10,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.streamvault.backend.auth.AuthenticatedUser;
+import com.streamvault.backend.auth.JwtService;
+import com.streamvault.backend.config.SecurityConfig;
 import com.streamvault.backend.settings.dto.AccountSettingsResponse;
 import com.streamvault.backend.settings.exception.InvalidRatingTypeException;
 
@@ -29,14 +33,19 @@ import com.streamvault.backend.settings.exception.InvalidRatingTypeException;
  * Contract lives in docs/specs/design/story-005-api-contracts.md. Expected to fail to compile
  * until Dev adds AccountSettingsController/AccountSettingsService per the contract.
  *
- * First test in this codebase to exercise @AuthenticationPrincipal inside a @WebMvcTest slice: the
- * `authentication(...)` request post-processor from spring-security-test populates the
- * SecurityContext for the duration of a single request independent of whether the real filter
- * chain is applied, so it works the same with addFilters = false as the rest of this codebase's
- * controller slice tests use.
+ * First test in this codebase to exercise @AuthenticationPrincipal inside a @WebMvcTest slice.
+ * With addFilters = false (matching this codebase's other controller slice tests), the real
+ * security filter chain never runs, so the security-context-repository-based
+ * SecurityMockMvcRequestPostProcessors.authentication(...) postprocessor has nothing to load the
+ * saved context back from at dispatch time. Setting SecurityContextHolder directly instead works
+ * regardless of addFilters, since MockMvc dispatches synchronously on the test thread and
+ * AuthenticationPrincipalArgumentResolver reads the same thread-local SecurityContextHolder.
+ * @WebMvcTest does not load plain @Configuration classes by default, so SecurityConfig (which is
+ * what registers that argument resolver via @EnableWebSecurity) must be imported explicitly.
  */
 @WebMvcTest(AccountSettingsController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(SecurityConfig.class)
 class AccountSettingsControllerTest {
 
     private static final AuthenticatedUser PRINCIPAL = new AuthenticatedUser(42L, "user@example.com");
@@ -47,8 +56,18 @@ class AccountSettingsControllerTest {
     @MockitoBean
     private AccountSettingsService accountSettingsService;
 
-    private static Authentication asPrincipal() {
-        return new UsernamePasswordAuthenticationToken(PRINCIPAL, null, List.of());
+    @MockitoBean
+    private JwtService jwtService;
+
+    @BeforeEach
+    void setUpSecurityContext() {
+        SecurityContextHolder.getContext()
+                .setAuthentication(new UsernamePasswordAuthenticationToken(PRINCIPAL, null, List.of()));
+    }
+
+    @AfterEach
+    void tearDownSecurityContext() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -56,7 +75,7 @@ class AccountSettingsControllerTest {
         when(accountSettingsService.getSettings(42L))
                 .thenReturn(new AccountSettingsResponse("LOVE_LIKE_MEH_DISLIKE_HATE"));
 
-        mockMvc.perform(get("/api/account/settings").with(authentication(asPrincipal())))
+        mockMvc.perform(get("/api/account/settings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ratingType").value("LOVE_LIKE_MEH_DISLIKE_HATE"));
     }
@@ -67,7 +86,6 @@ class AccountSettingsControllerTest {
                 .thenReturn(new AccountSettingsResponse("THUMBS_UP_THUMBS_DOWN"));
 
         mockMvc.perform(patch("/api/account/settings")
-                        .with(authentication(asPrincipal()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ratingType\":\"THUMBS_UP_THUMBS_DOWN\"}"))
                 .andExpect(status().isOk())
@@ -77,7 +95,6 @@ class AccountSettingsControllerTest {
     @Test
     void should_return400_when_ratingTypeIsBlank() throws Exception {
         mockMvc.perform(patch("/api/account/settings")
-                        .with(authentication(asPrincipal()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ratingType\":\"\"}"))
                 .andExpect(status().isBadRequest())
@@ -90,7 +107,6 @@ class AccountSettingsControllerTest {
                 .thenThrow(new InvalidRatingTypeException("FIVE_STARS"));
 
         mockMvc.perform(patch("/api/account/settings")
-                        .with(authentication(asPrincipal()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ratingType\":\"FIVE_STARS\"}"))
                 .andExpect(status().isBadRequest())

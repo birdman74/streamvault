@@ -19,7 +19,12 @@ on:
 jobs:
   trigger-test-review:
     runs-on: self-hosted
-    if: github.actor == 'briankcampbell-streamvault-bot' || github.event_name == 'workflow_dispatch'
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.actor == 'briankcampbell-streamvault-bot' &&
+        startsWith(github.head_ref, 'feature/')
+      )
 
     steps:
       - name: Checkout
@@ -37,7 +42,6 @@ jobs:
             STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
             PR_NUMBER="${{ github.event.pull_request.number }}"
           fi
-
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT

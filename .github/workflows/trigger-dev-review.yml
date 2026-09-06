@@ -12,7 +12,7 @@ on:
         description: 'Story ID (e.g. story-002)'
         required: true
       feature_branch:
-        description: 'Feature branch name (e.g. feature/story-002-google-oauth)'
+        description: 'Feature branch name'
         required: true
       review_round:
         description: 'Review round number (1, 2, or 3)'
@@ -38,10 +38,8 @@ jobs:
             BRANCH="${{ github.event.inputs.feature_branch }}"
             ROUND="${{ github.event.inputs.review_round }}"
           else
-            CHANGED=$(echo '${{ toJson(github.event.commits) }}' | \
-              jq -r '.[].modified[], .[].added[] | select(test("docs/specs/design/story-[0-9]+-.*\\.md"))' 2>/dev/null | head -1)
-            STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
             BRANCH="${{ github.ref_name }}"
+            STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
             ROUND=1
             for i in 1 2 3; do
               if [ -f "docs/specs/design/${STORY_ID}-dev-feedback-r${i}.md" ]; then
@@ -49,7 +47,6 @@ jobs:
               fi
             done
           fi
-
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "round=$ROUND" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
@@ -58,8 +55,7 @@ jobs:
       - name: Check iteration limit
         id: limit_check
         run: |
-          ROUND=${{ steps.context.outputs.round }}
-          if [ "$ROUND" -gt 3 ]; then
+          if [ "${{ steps.context.outputs.round }}" -gt 3 ]; then
             echo "limit_reached=true" >> $GITHUB_OUTPUT
           else
             echo "limit_reached=false" >> $GITHUB_OUTPUT
@@ -76,7 +72,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `⚠️ ${storyId}: Design iteration limit reached — Brian review required`,
-              body: `## Design Iteration Impasse\n\nTest and Dev have completed 3 rounds of design iteration on **${storyId}** without reaching agreement.\n\n**Branch**: \`${branch}\`\n\n**Design artifacts**: \`docs/specs/design/${storyId}-*\`\n\n### What to do\n1. Review the feedback files on the branch to understand the disagreement\n2. Make a decision and update the story spec if needed\n3. Manually commit \`docs/specs/design/${storyId}-agreed.md\` to unblock implementation\n\nThe automated workflow is paused until \`${storyId}-agreed.md\` is committed.`,
+              body: `Test and Dev have completed 3 rounds without agreement on **${storyId}**.\n\nBranch: \`${branch}\`\nArtifacts: \`docs/specs/design/${storyId}-*\`\n\nManually commit \`${storyId}-agreed.md\` to unblock.`,
               labels: ['needs-brian', 'blocked']
             });
 
@@ -87,5 +83,4 @@ jobs:
           REVIEW_ROUND: ${{ steps.context.outputs.round }}
           FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
         run: |
-          echo "Launching Dev persona for $STORY_ID review round $REVIEW_ROUND..."
           /home/brian/bin/streamvault-dev-auto.sh "Test has committed a design artifact to feature branch $FEATURE_BRANCH for $STORY_ID. This is review round $REVIEW_ROUND. Read docs/specs/design/$STORY_ID-test-plan.md and all revision files up to this round. Execute your design review phase per your CLAUDE.md: either commit $STORY_ID-agreed.md if you accept the design, or commit $STORY_ID-dev-feedback-r${REVIEW_ROUND}.md with specific actionable concerns. Commit and push to origin/$FEATURE_BRANCH."

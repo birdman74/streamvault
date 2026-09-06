@@ -18,7 +18,7 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-09-04
+2026-09-06
 
 ### Current Phase
 Application Development - User Authentication epic complete and merged (STORY-001, STORY-002). Autonomous Agentic Workflow epic complete (STORY-003, STORY-004). Personal Streaming Library epic defined by PO: STORY-005 through STORY-019 specced and queued for Test and Dev.
@@ -94,7 +94,7 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 ### Epic: Personal Streaming Library
 Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the queue picks up STORY-005
 
-- [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic
+- [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic - Test Phase 1 complete: test plan, API contracts, and failing tests pushed to `feature/story-005-account-settings-rating-type`, awaiting Dev design review round 1
 - [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`)
 - [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006

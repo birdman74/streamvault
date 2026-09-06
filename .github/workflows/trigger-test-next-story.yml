@@ -32,7 +32,7 @@ jobs:
           github.event.pull_request.merged == true &&
           startsWith(github.event.pull_request.head.ref, 'feature/')
         env:
-          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.QUEUE_MANAGER_GH_TOKEN }}
         run: |
           BRANCH="${{ github.event.pull_request.head.ref }}"
           STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
@@ -66,7 +66,7 @@ jobs:
           github.event_name == 'push' ||
           (github.event_name == 'pull_request' && startsWith(github.event.pull_request.head.ref, 'feature/'))
         env:
-          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.QUEUE_MANAGER_GH_TOKEN }}
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.story_id }}" ]; then
             NEXT_STORY="${{ github.event.inputs.story_id }}"
@@ -95,7 +95,7 @@ jobs:
       - name: Mark next story as in-progress
         if: steps.queue.outputs.next_story != ''
         env:
-          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.QUEUE_MANAGER_GH_TOKEN }}
         run: |
           STORY_ID="${{ steps.queue.outputs.next_story }}"
 
@@ -106,10 +106,7 @@ jobs:
             --jq ".[] | select(.title | test(\"$STORY_ID\")) | .number" 2>/dev/null)
 
           if [ -n "$ISSUE_NUMBER" ]; then
-            gh api \
-              --method POST \
-              /repos/birdman74/streamvault/issues/$ISSUE_NUMBER/labels \
-              -f labels[]=in-progress
+            gh issue edit "$ISSUE_NUMBER" --add-label "in-progress"
             echo "Marked issue #$ISSUE_NUMBER as in-progress"
           else
             echo "WARNING: No open issue found for $STORY_ID"

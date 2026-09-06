@@ -11,7 +11,7 @@ on:
         description: 'Story ID (e.g. story-002)'
         required: true
       feature_branch:
-        description: 'Feature branch name (e.g. feature/story-002-google-oauth)'
+        description: 'Feature branch name'
         required: true
 
 jobs:
@@ -32,20 +32,16 @@ jobs:
             STORY_ID="${{ github.event.inputs.story_id }}"
             BRANCH="${{ github.event.inputs.feature_branch }}"
           else
-            CHANGED=$(echo '${{ toJson(github.event.commits) }}' | \
-              jq -r '.[].modified[], .[].added[] | select(test("docs/specs/design/story-[0-9]+-.*\\.md"))' 2>/dev/null | head -1)
-            STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
             BRANCH="${{ github.ref_name }}"
+            STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
           fi
-
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-          echo "Agreement reached for $STORY_ID on $BRANCH — triggering implementation"
+          echo "Agreement reached for $STORY_ID on $BRANCH"
 
       - name: Launch Dev persona for implementation
         env:
           STORY_ID: ${{ steps.context.outputs.story_id }}
           FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
         run: |
-          echo "Launching Dev persona to implement $STORY_ID..."
           /home/brian/bin/streamvault-dev-auto.sh "Design agreement has been reached for $STORY_ID on branch $FEATURE_BRANCH. Read docs/specs/design/$STORY_ID-agreed.md and execute your implementation phase per your CLAUDE.md: write failing unit tests first, implement until all tests pass including Test's failing tests, commit the implementation, push to origin/$FEATURE_BRANCH, then open a PR as the bot account targeting main."

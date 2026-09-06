@@ -11,10 +11,10 @@ on:
         description: 'Story ID (e.g. story-002)'
         required: true
       feature_branch:
-        description: 'Feature branch name (e.g. feature/story-002-google-oauth)'
+        description: 'Feature branch name'
         required: true
       revision_round:
-        description: 'Revision round number (1, 2, or 3)'
+        description: 'Revision round number'
         required: true
         default: '1'
 
@@ -37,13 +37,16 @@ jobs:
             BRANCH="${{ github.event.inputs.feature_branch }}"
             ROUND="${{ github.event.inputs.revision_round }}"
           else
-            CHANGED=$(echo '${{ toJson(github.event.commits) }}' | \
-              jq -r '.[].modified[], .[].added[] | select(test("docs/specs/design/story-[0-9]+-.*\\.md"))' 2>/dev/null | head -1)
-            STORY_ID=$(echo "$CHANGED" | grep -oP 'story-\d+')
-            ROUND=$(echo "$CHANGED" | grep -oP '(?<=r)\d+')
             BRANCH="${{ github.ref_name }}"
+            STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
+            # Determine round from existing feedback files on disk
+            ROUND=0
+            for i in 1 2 3; do
+              if [ -f "docs/specs/design/${STORY_ID}-dev-feedback-r${i}.md" ]; then
+                ROUND=$i
+              fi
+            done
           fi
-
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "round=$ROUND" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
@@ -55,5 +58,4 @@ jobs:
           REVISION_ROUND: ${{ steps.context.outputs.round }}
           FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
         run: |
-          echo "Launching Test persona for $STORY_ID revision round $REVISION_ROUND..."
           /home/brian/bin/streamvault-test-auto.sh "Dev has committed feedback file docs/specs/design/$STORY_ID-dev-feedback-r${REVISION_ROUND}.md on branch $FEATURE_BRANCH. Read Dev's concerns carefully and execute your revision phase per your CLAUDE.md: revise the test plan and contracts where Dev's feedback is technically valid without dropping AC coverage, then commit $STORY_ID-test-revision-r${REVISION_ROUND}.md and push to origin/$FEATURE_BRANCH."

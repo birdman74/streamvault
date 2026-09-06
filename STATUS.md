@@ -21,10 +21,11 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 2026-09-06
 
 ### STORY-005 Status
-Implementation complete: migration, `RatingType` enum, `User.ratingType`, `settings` package
-(DTOs, `AccountSettingsService`, `AccountSettingsController`), `GlobalExceptionHandler` extension.
-All 67 backend tests pass (`mvn clean verify`). PR open against `main` for Test verification and
-Brian's review.
+Test verification complete on PR #25. All AC-1 through AC-6 covered by passing tests. Added
+6 regression tests (`SecurityConfigAuthFlowTest`) covering the `SecurityConfig` `@EnableWebSecurity`
+change, a deviation from the agreed design not previously exercised end-to-end. Full suite:
+73/73 passing (`mvn clean verify`). Formal PR review submitted; recommendation flagged to Brian
+regarding the `@EnableWebSecurity` change's stated rationale. Awaiting Brian's review.
 
 ### Current Phase
 Application Development - User Authentication epic complete and merged (STORY-001, STORY-002). Autonomous Agentic Workflow epic complete (STORY-003, STORY-004). Personal Streaming Library epic defined by PO: STORY-005 through STORY-019 specced and queued for Test and Dev.

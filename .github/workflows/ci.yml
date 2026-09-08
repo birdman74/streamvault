@@ -72,6 +72,15 @@ jobs:
         working-directory: backend
         run: mvn clean verify -q
 
+      - name: Upload coverage to Codecov
+        if: steps.backend_check.outputs.exists == 'true'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: backend/target/site/jacoco/jacoco.xml
+          flags: backend
+          fail_ci_if_error: false
+
       - name: Upload coverage report
         if: steps.backend_check.outputs.exists == 'true'
         uses: actions/upload-artifact@v4

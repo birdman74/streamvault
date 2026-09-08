@@ -17,6 +17,8 @@ on:
 
 jobs:
   trigger-po-on-changes-requested:
+    permissions:
+      contents: read
     runs-on: self-hosted
     if: |
       github.event_name == 'workflow_dispatch' ||
@@ -32,13 +34,13 @@ jobs:
 
       - name: Identify context
         id: context
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             BRANCH="${{ github.event.inputs.specs_branch }}"
             PR_NUMBER="${{ github.event.inputs.pr_number }}"
-          else
-            BRANCH="${{ github.event.pull_request.head.ref }}"
-            PR_NUMBER="${{ github.event.pull_request.number }}"
           fi
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT

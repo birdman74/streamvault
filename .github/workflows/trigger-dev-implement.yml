@@ -16,6 +16,8 @@ on:
 
 jobs:
   trigger-dev-implement:
+    permissions:
+      contents: read
     runs-on: self-hosted
     if: github.actor == 'birdman74' || github.actor == 'briankcampbell-streamvault-bot'
 

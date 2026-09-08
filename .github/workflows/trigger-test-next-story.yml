@@ -16,6 +16,8 @@ on:
 
 jobs:
   queue-next-story:
+    permissions:
+      contents: read
     runs-on: self-hosted
     if: |
       github.event_name == 'workflow_dispatch' ||
@@ -106,7 +108,10 @@ jobs:
             --jq ".[] | select(.title | test(\"$STORY_ID\")) | .number" 2>/dev/null)
 
           if [ -n "$ISSUE_NUMBER" ]; then
-            gh issue edit "$ISSUE_NUMBER" --add-label "in-progress"
+            gh api \
+              --method POST \
+              /repos/birdman74/streamvault/issues/$ISSUE_NUMBER/labels \
+              -f 'labels[]=in-progress'
             echo "Marked issue #$ISSUE_NUMBER as in-progress"
           else
             echo "WARNING: No open issue found for $STORY_ID"

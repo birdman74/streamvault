@@ -21,6 +21,8 @@ on:
 
 jobs:
   route-changes-requested:
+    permissions:
+      contents: read
     runs-on: self-hosted
     if: |
       github.event_name == 'workflow_dispatch' ||
@@ -32,6 +34,10 @@ jobs:
 
       - name: Identify reviewer and story context
         id: context
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEWER: ${{ github.event.review.user.login }}
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             REVIEWER="${{ github.event.inputs.reviewer }}"
@@ -39,10 +45,7 @@ jobs:
             BRANCH="${{ github.event.inputs.feature_branch }}"
             PR_NUMBER="${{ github.event.inputs.pr_number }}"
           else
-            REVIEWER="${{ github.event.review.user.login }}"
-            BRANCH="${{ github.event.pull_request.head.ref }}"
             STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
-            PR_NUMBER="${{ github.event.pull_request.number }}"
           fi
 
           echo "reviewer=$REVIEWER" >> $GITHUB_OUTPUT

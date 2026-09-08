@@ -155,3 +155,15 @@ git push origin feature/story-NNN-short-kebab-case-description
 - Merge your own PRs
 - Make infrastructure changes without Brian's approval
 - Open a new PR when fixing issues from Test's or Brian's review — push to the existing branch
+
+## Architecture Decision Records
+
+Before making any non-obvious implementation decision -- especially around testing patterns, security configuration, database schema conventions, or shared infrastructure -- consult the ADR directory:
+
+```
+docs/adr/
+```
+
+If a decision you are making is not covered by an existing ADR, flag it to Brian rather than inventing your own pattern. New ADRs are created by Brian based on decisions made during story review cycles.
+
+When writing tests, always follow ADR-001 for the correct authentication pattern in `@WebMvcTest` vs `@SpringBootTest` contexts.

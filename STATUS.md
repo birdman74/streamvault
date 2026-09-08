@@ -18,14 +18,19 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-09-06
+2026-09-08
 
 ### STORY-005 Status
-Test verification complete on PR #25. All AC-1 through AC-6 covered by passing tests. Added
-6 regression tests (`SecurityConfigAuthFlowTest`) covering the `SecurityConfig` `@EnableWebSecurity`
-change, a deviation from the agreed design not previously exercised end-to-end. Full suite:
-73/73 passing (`mvn clean verify`). Formal PR review submitted; recommendation flagged to Brian
-regarding the `@EnableWebSecurity` change's stated rationale. Awaiting Brian's review.
+Brian posted Changes Requested on PR #25: `AccountSettingsControllerTest` seeds its principal via
+`SecurityContextHolder` directly, violating ADR-001 / CONTRIBUTING.md (slice tests must use
+`@WithMockUser` or a custom `@WithSecurityContext` annotation). Phase 4: pushed failing tests
+covering the gap — `ControllerSliceTestAuthConventionTest` (source-scanning guard: no `@WebMvcTest`
+slice touches `SecurityContextHolder`; principal declared via a `@With...` annotation) and
+`AccountSettingsControllerPrincipalConventionTest` (reference impl using the not-yet-existing
+`@WithMockAuthenticatedUser` custom `@WithSecurityContext` annotation; fails to compile until Dev
+adds it). Contract for the annotation in `docs/specs/design/story-005-brian-review-r1.md`. Push
+triggers Dev to add the annotation and refactor `AccountSettingsControllerTest`. No AC coverage
+change. Awaiting Dev fix.
 
 ### Current Phase
 Application Development - User Authentication epic complete and merged (STORY-001, STORY-002). Autonomous Agentic Workflow epic complete (STORY-003, STORY-004). Personal Streaming Library epic defined by PO: STORY-005 through STORY-019 specced and queued for Test and Dev.

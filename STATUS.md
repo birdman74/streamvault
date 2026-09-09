@@ -18,19 +18,18 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-09-08
+2026-09-09
 
 ### STORY-005 Status
-Brian posted Changes Requested on PR #25: `AccountSettingsControllerTest` seeds its principal via
-`SecurityContextHolder` directly, violating ADR-001 / CONTRIBUTING.md (slice tests must use
-`@WithMockUser` or a custom `@WithSecurityContext` annotation). Phase 4: pushed failing tests
-covering the gap — `ControllerSliceTestAuthConventionTest` (source-scanning guard: no `@WebMvcTest`
-slice touches `SecurityContextHolder`; principal declared via a `@With...` annotation) and
-`AccountSettingsControllerPrincipalConventionTest` (reference impl using the not-yet-existing
-`@WithMockAuthenticatedUser` custom `@WithSecurityContext` annotation; fails to compile until Dev
-adds it). Contract for the annotation in `docs/specs/design/story-005-brian-review-r1.md`. Push
-triggers Dev to add the annotation and refactor `AccountSettingsControllerTest`. No AC coverage
-change. Awaiting Dev fix.
+Phase 4 Dev fix pushed to PR #25 addressing Test's Changes Requested review. Added
+`testsupport/WithMockAuthenticatedUser` (custom `@WithSecurityContext` meta-annotation) plus
+`WithMockAuthenticatedUserSecurityContextFactory` per `docs/specs/design/story-005-brian-review-r1.md`.
+Refactored `AccountSettingsControllerTest` to drop the `@BeforeEach`/`@AfterEach` security-context
+seeding and use `@WithMockAuthenticatedUser(userId = 42L, email = "user@example.com")` instead.
+Reworded one Javadoc sentence in `AccountSettingsControllerPrincipalConventionTest` so the bare
+`SecurityContextHolder` token no longer appears in prose (the source-scanning guard in
+`ControllerSliceTestAuthConventionTest` matched Test's own reference file on that literal). Full
+suite green: 77/77 via `mvn clean verify`. Awaiting Test re-verification.
 
 ### Current Phase
 Application Development - User Authentication epic complete and merged (STORY-001, STORY-002). Autonomous Agentic Workflow epic complete (STORY-003, STORY-004). Personal Streaming Library epic defined by PO: STORY-005 through STORY-019 specced and queued for Test and Dev.

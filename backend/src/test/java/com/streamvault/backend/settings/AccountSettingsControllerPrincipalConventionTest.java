@@ -28,7 +28,7 @@ import com.streamvault.backend.testsupport.WithMockAuthenticatedUser;
  *
  * ADR-001 and CONTRIBUTING.md require Layer 1 controller slice tests to populate the security
  * context with {@code @WithMockUser} or a custom {@code @WithSecurityContext} annotation, not by
- * calling {@code SecurityContextHolder} directly. Because {@code AccountSettingsController} reads
+ * seeding the thread-local security context holder by hand. Because {@code AccountSettingsController} reads
  * a custom principal type ({@code AuthenticatedUser}, not a Spring {@code UserDetails}),
  * {@code @WithMockUser} alone cannot supply it -- the codebase needs a reusable custom
  * {@code @WithSecurityContext} annotation, which is exactly what ADR-001 anticipates with

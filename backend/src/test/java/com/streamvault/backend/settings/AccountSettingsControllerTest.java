@@ -8,47 +8,41 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.util.List;
-
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.streamvault.backend.auth.AuthenticatedUser;
 import com.streamvault.backend.auth.JwtService;
 import com.streamvault.backend.config.SecurityConfig;
 import com.streamvault.backend.settings.dto.AccountSettingsResponse;
 import com.streamvault.backend.settings.exception.InvalidRatingTypeException;
+import com.streamvault.backend.testsupport.WithMockAuthenticatedUser;
 
 /**
- * Contract lives in docs/specs/design/story-005-api-contracts.md. Expected to fail to compile
- * until Dev adds AccountSettingsController/AccountSettingsService per the contract.
+ * Contract lives in docs/specs/design/story-005-api-contracts.md.
  *
- * First test in this codebase to exercise @AuthenticationPrincipal inside a @WebMvcTest slice.
- * With addFilters = false (matching this codebase's other controller slice tests), the real
- * security filter chain never runs, so the security-context-repository-based
- * SecurityMockMvcRequestPostProcessors.authentication(...) postprocessor has nothing to load the
- * saved context back from at dispatch time. Setting SecurityContextHolder directly instead works
- * regardless of addFilters, since MockMvc dispatches synchronously on the test thread and
- * AuthenticationPrincipalArgumentResolver reads the same thread-local SecurityContextHolder.
- * @WebMvcTest does not load plain @Configuration classes by default, so SecurityConfig (which is
- * what registers that argument resolver via @EnableWebSecurity) must be imported explicitly.
+ * First test in this codebase to exercise {@code @AuthenticationPrincipal} inside a
+ * {@code @WebMvcTest} slice. Per ADR-001 the authenticated principal is populated with the custom
+ * {@link WithMockAuthenticatedUser} {@code @WithSecurityContext} annotation rather than by touching
+ * the security context holder directly, since {@code @WithMockUser} seeds a Spring
+ * {@code UserDetails} principal and this controller resolves the codebase's own
+ * {@link com.streamvault.backend.auth.AuthenticatedUser} type.
+ *
+ * {@code addFilters = false} stays consistent with this codebase's other controller slice tests.
+ * {@code @WebMvcTest} does not load plain {@code @Configuration} classes by default, so
+ * {@link SecurityConfig} (which registers the {@code @AuthenticationPrincipal} argument resolver via
+ * {@code @EnableWebSecurity}) is imported explicitly.
  */
 @WebMvcTest(AccountSettingsController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @Import(SecurityConfig.class)
+@WithMockAuthenticatedUser(userId = 42L, email = "user@example.com")
 class AccountSettingsControllerTest {
-
-    private static final AuthenticatedUser PRINCIPAL = new AuthenticatedUser(42L, "user@example.com");
 
     @Autowired
     private MockMvc mockMvc;
@@ -58,17 +52,6 @@ class AccountSettingsControllerTest {
 
     @MockitoBean
     private JwtService jwtService;
-
-    @BeforeEach
-    void setUpSecurityContext() {
-        SecurityContextHolder.getContext()
-                .setAuthentication(new UsernamePasswordAuthenticationToken(PRINCIPAL, null, List.of()));
-    }
-
-    @AfterEach
-    void tearDownSecurityContext() {
-        SecurityContextHolder.clearContext();
-    }
 
     @Test
     void should_return200WithCurrentRatingType_when_authenticatedUserRequestsSettings() throws Exception {

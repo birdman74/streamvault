@@ -34,4 +34,24 @@ class UserTest {
         assertThatThrownBy(() -> new User("user@example.com", "   "))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    /**
+     * story-005 AC-3: a newly registered account defaults to "Love / Like / Meh / Dislike / Hate"
+     * without the user taking any action. Covers both existing registration paths (STORY-001 local
+     * account, STORY-002 Google account) so the default holds regardless of which factory a caller
+     * uses.
+     */
+    @Test
+    void should_defaultToLoveLikeMehDislikeHateRatingType_when_localAccountIsConstructed() {
+        User user = new User("user@example.com", "hashed-password");
+
+        assertThat(user.getRatingType()).isEqualTo(RatingType.LOVE_LIKE_MEH_DISLIKE_HATE);
+    }
+
+    @Test
+    void should_defaultToLoveLikeMehDislikeHateRatingType_when_googleUserIsConstructed() {
+        User user = User.googleUser("user@example.com", "google-subject-12345");
+
+        assertThat(user.getRatingType()).isEqualTo(RatingType.LOVE_LIKE_MEH_DISLIKE_HATE);
+    }
 }

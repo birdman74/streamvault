@@ -16,6 +16,7 @@ import com.streamvault.backend.auth.exception.EmailAlreadyRegisteredException;
 import com.streamvault.backend.auth.exception.GoogleAccountEmailCollisionException;
 import com.streamvault.backend.auth.exception.GoogleSignInException;
 import com.streamvault.backend.auth.exception.InvalidCredentialsException;
+import com.streamvault.backend.settings.exception.InvalidRatingTypeException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -58,6 +59,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleGoogleAccountEmailCollision() {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("error", "An account with this email already exists. Please sign in with your password."));
+    }
+
+    @ExceptionHandler(InvalidRatingTypeException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidRatingType(InvalidRatingTypeException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)

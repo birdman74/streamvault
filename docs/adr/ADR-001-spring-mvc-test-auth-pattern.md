@@ -26,6 +26,8 @@ Use the following two-layer testing convention throughout this codebase:
 - Always `@Import(SecurityConfig.class)` when the controller uses `@AuthenticationPrincipal` -- `@WebMvcTest` does not load plain `@Configuration` classes by default
 - Do NOT use `SecurityContextHolder.setContext()` directly -- this is an implementation detail of how `@WithMockUser` works internally and should not appear in test code
 
+**Note on principal types:** `@WithMockUser` creates a Spring Security `User` principal and is only appropriate when the controller parameter is `UserDetails` or a compatible Spring Security type. When a controller uses `@AuthenticationPrincipal` with a custom principal class (e.g. `AuthenticatedUser`), a custom `@WithSecurityContext` annotation must be created instead. See `testsupport/WithMockAuthenticatedUser.java` as the reference implementation for this codebase.
+
 ### Layer 2: Security Integration Tests (`@SpringBootTest`)
 - Use real JWT round-trips: register -> login -> extract token -> authenticate request
 - Exercise the full security filter chain end-to-end

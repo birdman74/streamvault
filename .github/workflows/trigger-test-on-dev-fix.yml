@@ -20,7 +20,7 @@ jobs:
     permissions:
       contents: read
     runs-on: self-hosted
-    if: github.actor == 'briankcampbell-streamvault-bot' || github.event_name == 'workflow_dispatch'
+    if: github.actor == 'birdman74' || github.actor == 'briankcampbell-streamvault-bot' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout

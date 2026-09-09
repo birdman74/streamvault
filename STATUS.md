@@ -32,6 +32,21 @@ fix (diff: STATUS.md + 2 new test-support classes + 2 test files). Full suite gr
 and pinned by `AccountSettingsControllerPrincipalConventionTest`. All AC-1..AC-6 and all cross-story
 invariants covered by passing tests. Test APPROVED on PR #25; awaiting Brian's review and merge.
 
+### STORY-006 Status
+Phase 1 (Test goes first) complete on branch `feature/story-006-tmdb-search-browse`. Test plan
+(`docs/specs/design/story-006-test-plan.md`) maps every AC-1..AC-8 plus cross-story invariants to
+named tests; API contracts (`docs/specs/design/story-006-api-contracts.md`) define `GET
+/api/tmdb/search` and `GET /api/tmdb/browse`, a shared `TmdbResultPage` / `TmdbResult` projection,
+`MOVIE`/`SERIES` and `POPULAR`/`TRENDING` wire enums, 400 validation envelopes, 401 reuse of the
+existing entry point, and a new 502 `TmdbUnavailableException` mapping. Six failing test classes
+committed: `TmdbControllerTest`, `TmdbCatalogServiceTest`, `RestClientTmdbGatewayTest` (MockRest,
+mirrors `GoogleTokenInfoVerifierTest`), `dto/TmdbSearchRequestValidationTest`,
+`TmdbEndpointsSecurityTest` (Layer 2 real filter chain, AC-8 + `SecurityConfig` invariant), and
+`TmdbPackageReadOnlyConventionTest` (source scan guarding AC-7 read-only + no new migration).
+RED confirmed: `mvn clean test-compile` fails only on the nine unimplemented `com.streamvault.backend.tmdb`
+symbols, consistent with the story-002/story-005 RED convention. Awaiting Dev design review
+(`story-006-dev-feedback-r1.md`). This story adds no Flyway migration and no `SecurityConfig` change.
+
 ### Current Phase
 Application Development - User Authentication epic complete and merged (STORY-001, STORY-002). Autonomous Agentic Workflow epic complete (STORY-003, STORY-004). Personal Streaming Library epic defined by PO: STORY-005 through STORY-019 specced and queued for Test and Dev.
 
@@ -107,7 +122,7 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the queue picks up STORY-005
 
 - [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic - Dev implementation complete, Phase 4 Brian-review fix re-verified by Test (77/77 green, all ACs + invariants covered), Test APPROVED on PR #25, awaiting Brian's review and merge
-- [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`)
+- [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Phase 1 complete: test plan, API contracts, and 6 failing test classes on `feature/story-006-tmdb-search-browse`, RED confirmed; awaiting Dev design review
 - [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008

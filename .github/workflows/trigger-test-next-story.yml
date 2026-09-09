@@ -61,6 +61,10 @@ jobs:
             echo "No open issue found for $STORY_ID — may have already been closed."
           fi
 
+      - name: Wait for GitHub API to reflect issue close
+        if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+        run: sleep 30
+        
       - name: Determine next story
         id: queue
         if: |

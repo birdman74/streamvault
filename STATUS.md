@@ -21,15 +21,16 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 2026-09-09
 
 ### STORY-005 Status
-Phase 4 Dev fix pushed to PR #25 addressing Test's Changes Requested review. Added
-`testsupport/WithMockAuthenticatedUser` (custom `@WithSecurityContext` meta-annotation) plus
-`WithMockAuthenticatedUserSecurityContextFactory` per `docs/specs/design/story-005-brian-review-r1.md`.
-Refactored `AccountSettingsControllerTest` to drop the `@BeforeEach`/`@AfterEach` security-context
-seeding and use `@WithMockAuthenticatedUser(userId = 42L, email = "user@example.com")` instead.
-Reworded one Javadoc sentence in `AccountSettingsControllerPrincipalConventionTest` so the bare
-`SecurityContextHolder` token no longer appears in prose (the source-scanning guard in
-`ControllerSliceTestAuthConventionTest` matched Test's own reference file on that literal). Full
-suite green: 77/77 via `mvn clean verify`. Awaiting Test re-verification.
+Test re-verification of the Phase 4 Dev fix on PR #25 (commit 2af535c) complete. Dev's fix is
+test-infrastructure only: added `testsupport/WithMockAuthenticatedUser` + its
+`WithMockAuthenticatedUserSecurityContextFactory` per `docs/specs/design/story-005-brian-review-r1.md`,
+refactored `AccountSettingsControllerTest` off the `@BeforeEach`/`@AfterEach` `SecurityContextHolder`
+seeding onto `@WithMockAuthenticatedUser(userId = 42L, email = "user@example.com")`, and reworded one
+Javadoc line so the source-scanning guard no longer matches prose. No production code changed by this
+fix (diff: STATUS.md + 2 new test-support classes + 2 test files). Full suite green: 77/77 via
+`mvn clean verify`. Convention now enforced by `ControllerSliceTestAuthConventionTest` (both halves)
+and pinned by `AccountSettingsControllerPrincipalConventionTest`. All AC-1..AC-6 and all cross-story
+invariants covered by passing tests. Test APPROVED on PR #25; awaiting Brian's review and merge.
 
 ### Current Phase
 Application Development - User Authentication epic complete and merged (STORY-001, STORY-002). Autonomous Agentic Workflow epic complete (STORY-003, STORY-004). Personal Streaming Library epic defined by PO: STORY-005 through STORY-019 specced and queued for Test and Dev.
@@ -105,7 +106,7 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 ### Epic: Personal Streaming Library
 Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the queue picks up STORY-005
 
-- [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic - Dev implementation complete, PR open against `main`, awaiting Test verification and Brian's review
+- [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic - Dev implementation complete, Phase 4 Brian-review fix re-verified by Test (77/77 green, all ACs + invariants covered), Test APPROVED on PR #25, awaiting Brian's review and merge
 - [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`)
 - [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006

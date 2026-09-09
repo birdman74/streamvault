@@ -33,8 +33,23 @@ and pinned by `AccountSettingsControllerPrincipalConventionTest`. All AC-1..AC-6
 invariants covered by passing tests. Test APPROVED on PR #25; awaiting Brian's review and merge.
 
 ### STORY-006 Status
-Phase 2 (Dev implementation) complete on branch `feature/story-006-tmdb-search-browse`; PR open,
-awaiting Test verification. New `com.streamvault.backend.tmdb` package: `TmdbController`
+Phase 3 (Test final PR verification) complete on PR #26, branch
+`feature/story-006-tmdb-search-browse`: **APPROVED**. Pulled the branch and ran `mvn clean verify` -
+full suite green 147/147, JaCoCo 75% instruction gate passes. Every AC-1..AC-8 is covered by at
+least one passing test and every cross-story invariant holds. Regression analysis of the diff: the
+only shared-runtime change is one additive `@ExceptionHandler(TmdbUnavailableException.class)` in
+`GlobalExceptionHandler` (no existing mapping altered; the other branches stay covered by
+`AccountSettingsControllerTest` and `AuthControllerGoogleTest`, both green); `application.yml` gains
+a `tmdb.*` block whose `api-key` has no default, matching the existing `GOOGLE_CLIENT_ID` /
+`JWT_SECRET` precedent, and the context-load smoke test (`StreamvaultBackendApplicationTests`) plus
+the two other full-context `@SpringBootTest` classes pass with the `tmdb.api-key`
+`@DynamicPropertySource` entry Dev added; no DB schema, `SecurityConfig`, repository, or shared
+service was touched (`TmdbPackageReadOnlyConventionTest` pins the migration set at V1..V4 and the
+`TmdbEndpointsSecurityTest` boundary tests confirm `/api/health` and `/api/auth/me` are unmoved). No
+new regression tests were required - every shared-infrastructure change is additive and already
+covered by an existing passing test. Awaiting Brian's review and merge.
+
+Phase 2 (Dev implementation) record: New `com.streamvault.backend.tmdb` package: `TmdbController`
 (`GET /api/tmdb/search`, `GET /api/tmdb/browse`), `TmdbCatalogService` (owns `page` null -> 1 and
 `list` null -> `POPULAR` defaults, no persistence collaborator), `TmdbGateway` +
 `RestClientTmdbGateway` (v3 `api_key` query param, `/search/multi` and `/trending/all/{week,day}`,
@@ -159,7 +174,7 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the queue picks up STORY-005
 
 - [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic - Dev implementation complete, Phase 4 Brian-review fix re-verified by Test (77/77 green, all ACs + invariants covered), Test APPROVED on PR #25, awaiting Brian's review and merge
-- [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Phase 2 complete: Dev implemented `com.streamvault.backend.tmdb` (search/browse endpoints, gateway, 502 mapping), full suite green 147/147 via `mvn clean verify`, PR open; awaiting Test verification
+- [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Phase 3 complete: Test verified PR #26, full suite green 147/147 via `mvn clean verify`, all AC-1..AC-8 + invariants covered, regression analysis clean, **APPROVED**; awaiting Brian's review and merge
 - [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008

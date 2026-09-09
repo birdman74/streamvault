@@ -14,7 +14,10 @@ jobs:
     permissions:
       contents: read
       issues: read
+<<<<<<< Updated upstream
       projects: write
+=======
+>>>>>>> Stashed changes
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'workflow_dispatch' ||

@@ -1,0 +1,106 @@
+name: Sync Project Board Status
+
+on:
+  issues:
+    types: [labeled, unlabeled, closed, reopened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to sync'
+        required: true
+
+jobs:
+  sync-board:
+    permissions:
+      contents: read
+      issues: read
+      projects: write
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue != null && contains(github.event.issue.labels.*.name, 'story'))
+
+    steps:
+      - name: Get issue number
+        id: issue
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "number=${{ github.event.inputs.issue_number }}" >> $GITHUB_OUTPUT
+          else
+            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get project item ID for issue
+        id: item
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ITEM_ID=$(gh api graphql -f query='
+          {
+            repository(owner: "birdman74", name: "streamvault") {
+              issue(number: ${{ steps.issue.outputs.number }}) {
+                projectItems(first: 5) {
+                  nodes {
+                    id
+                    project {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }' --jq '.data.repository.issue.projectItems.nodes[] | select(.project.id == "PVT_kwHOAB-hm84Bh9Z8") | .id')
+          echo "item_id=$ITEM_ID" >> $GITHUB_OUTPUT
+          echo "Project item ID: $ITEM_ID"
+
+      - name: Determine target status
+        id: status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # For manual dispatch, read current labels from API
+            LABELS=$(gh api repos/birdman74/streamvault/issues/${{ steps.issue.outputs.number }}/labels --jq '[.[].name]')
+            IS_CLOSED=$(gh api repos/birdman74/streamvault/issues/${{ steps.issue.outputs.number }} --jq '.state')
+          else
+            LABELS='${{ toJson(github.event.issue.labels.*.name) }}'
+            IS_CLOSED="${{ github.event.issue.state }}"
+          fi
+
+          if [ "$IS_CLOSED" == "closed" ]; then
+            echo "option_id=98236657" >> $GITHUB_OUTPUT
+            echo "status=Done" >> $GITHUB_OUTPUT
+          elif echo "$LABELS" | grep -q "in-progress"; then
+            echo "option_id=47fc9ee4" >> $GITHUB_OUTPUT
+            echo "status=In Progress" >> $GITHUB_OUTPUT
+          elif echo "$LABELS" | grep -q "blocked"; then
+            echo "option_id=be85d1d9" >> $GITHUB_OUTPUT
+            echo "status=Backlog" >> $GITHUB_OUTPUT
+          else
+            echo "option_id=b633126c" >> $GITHUB_OUTPUT
+            echo "status=Ready" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update project board status
+        if: steps.item.outputs.item_id != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api graphql -f query='
+          mutation {
+            updateProjectV2ItemFieldValue(
+              input: {
+                projectId: "PVT_kwHOAB-hm84Bh9Z8"
+                itemId: "${{ steps.item.outputs.item_id }}"
+                fieldId: "PVTSSF_lAHOAB-hm84Bh9Z8zhg3IUc"
+                value: {
+                  singleSelectOptionId: "${{ steps.status.outputs.option_id }}"
+                }
+              }
+            ) {
+              projectV2Item {
+                id
+              }
+            }
+          }'
+          echo "Moved issue #${{ steps.issue.outputs.number }} to ${{ steps.status.outputs.status }}"

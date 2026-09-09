@@ -21,3 +21,8 @@ app:
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   google:
     client-id: ${GOOGLE_CLIENT_ID}
+
+tmdb:
+  api-key: ${TMDB_API_KEY}
+  base-url: ${TMDB_BASE_URL:https://api.themoviedb.org/3}
+  image-base-url: ${TMDB_IMAGE_BASE_URL:https://image.tmdb.org/t/p/w500}

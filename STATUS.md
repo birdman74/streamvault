@@ -33,6 +33,34 @@ and pinned by `AccountSettingsControllerPrincipalConventionTest`. All AC-1..AC-6
 invariants covered by passing tests. Test APPROVED on PR #25; awaiting Brian's review and merge.
 
 ### STORY-006 Status
+Phase 2 (Dev implementation) complete on branch `feature/story-006-tmdb-search-browse`; PR open,
+awaiting Test verification. New `com.streamvault.backend.tmdb` package: `TmdbController`
+(`GET /api/tmdb/search`, `GET /api/tmdb/browse`), `TmdbCatalogService` (owns `page` null -> 1 and
+`list` null -> `POPULAR` defaults, no persistence collaborator), `TmdbGateway` +
+`RestClientTmdbGateway` (v3 `api_key` query param, `/search/multi` and `/trending/all/{week,day}`,
+`movie`/`tv` -> `MOVIE`/`SERIES` with `person` dropped, leading-4-digit year parse, absolute
+`posterUrl`, every `RestClientException`/non-2xx wrapped in `TmdbUnavailableException`), the two
+wire enums, the `TmdbResult`/`TmdbResultPage` projection, `TmdbSearchRequest`/`TmdbBrowseRequest`
+query-bound validated records, and `TmdbUnavailableException`. `GlobalExceptionHandler` gains one
+additive `@ExceptionHandler(TmdbUnavailableException.class)` -> 502 with the fixed message (cause
+logged, never in body). No `SecurityConfig` change (routes fall under `anyRequest().authenticated()`);
+no entity, repository, or Flyway migration (set stays V1..V4). Config: `application.yml` gains
+`tmdb.api-key`/`base-url`/`image-base-url`; `.env.example` gains `TMDB_IMAGE_BASE_URL`. The three
+`tmdb.*` props follow the agreed contract's no-default form for `api-key` (consistent with
+`GOOGLE_CLIENT_ID`), so the pre-existing full-context `@SpringBootTest` classes
+(`StreamvaultBackendApplicationTests`, `SecurityConfigAuthFlowTest`, `UserTableConstraintsTest`)
+each add `tmdb.api-key` to their existing `@DynamicPropertySource` block, mirroring how they
+already supply `app.jwt.secret` / `app.google.client-id`. Dev added lower-level unit tests below
+Test's integration boundary: `RestClientTmdbGatewayEdgeCasesTest` (year-parse edge cases, payload
+ordering after the person drop, absent/null `results` -> `List.of()`), `TmdbWireEnumTest`
+(enum `name()` round-trip), `TmdbUnavailableExceptionTest` (cause retention). Full suite green:
+147/147 via `mvn clean verify` (JaCoCo 75% gate passes). All six Test-authored failing classes now
+pass. No deviation from the agreed design's non-obvious framework point: the implicit
+`@ModelAttribute` constructor binding routes `@NotBlank`/`@Min`/`@Max` and the `list` type-mismatch
+through the existing `MethodArgumentNotValidException` handler exactly as predicted; no new handler
+branch was needed.
+
+### STORY-006 Phase 1 Record
 Phase 1 (Test goes first) complete on branch `feature/story-006-tmdb-search-browse`. Test plan
 (`docs/specs/design/story-006-test-plan.md`) maps every AC-1..AC-8 plus cross-story invariants to
 named tests; API contracts (`docs/specs/design/story-006-api-contracts.md`) define `GET
@@ -131,7 +159,7 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the queue picks up STORY-005
 
 - [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic - Dev implementation complete, Phase 4 Brian-review fix re-verified by Test (77/77 green, all ACs + invariants covered), Test APPROVED on PR #25, awaiting Brian's review and merge
-- [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Phase 1 complete: test plan, API contracts, 6 failing test classes, RED confirmed; Dev agreed design round 1 (`story-006-agreed.md`); awaiting Dev implementation
+- [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Phase 2 complete: Dev implemented `com.streamvault.backend.tmdb` (search/browse endpoints, gateway, 502 mapping), full suite green 147/147 via `mvn clean verify`, PR open; awaiting Test verification
 - [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008

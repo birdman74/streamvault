@@ -11,6 +11,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Contract lives in docs/specs/design/story-007-api-contracts.md. The
@@ -30,8 +31,15 @@ import org.springframework.test.context.DynamicPropertySource;
  *       impossible at rest;</li>
  *   <li>{@code release_year} / {@code poster_url} accept NULL (AC-2: stored null when TMDB omits them).</li>
  * </ul>
+ *
+ * <p>{@code @Transactional} so each method's {@code @BeforeEach} user seed rolls back afterwards -
+ * the class shares one cached context and one in-memory H2 database across methods, and the seeded
+ * users use fixed emails, so without rollback the second method collides on {@code users.email}. The
+ * schema-level violations under test are raised synchronously by H2 at statement execution, so the
+ * surrounding rollback does not mask them.
  */
 @SpringBootTest
+@Transactional
 class LibraryMoviesTableConstraintsTest {
 
     @DynamicPropertySource

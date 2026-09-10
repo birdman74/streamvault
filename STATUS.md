@@ -18,7 +18,7 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-09-09
+2026-09-10
 
 ### STORY-005 Status
 Test re-verification of the Phase 4 Dev fix on PR #25 (commit 2af535c) complete. Dev's fix is
@@ -99,6 +99,47 @@ Spring 6.1+), and validation failures are expected to route through the existing
 handler branch if implementation shows otherwise. Next: Dev implementation - unit tests first, then
 make Test's six failing classes plus the new Dev unit tests pass under `mvn clean verify`.
 
+### STORY-007 Phase 1 Record
+Phase 1 (Test goes first) complete on branch `feature/story-007-add-movie-from-tmdb`, cut from an
+up-to-date `main` (STORY-006 merged, PR #26, commit 33fb2a1). Test plan
+(`docs/specs/design/story-007-test-plan.md`) maps every AC-1..AC-7 plus the cross-story invariants
+to named tests; API contracts (`docs/specs/design/story-007-api-contracts.md`) define
+`POST /api/library/movies` (`AddMovieRequest` -> `LibraryMovieResponse`), the shared
+`WatchStatus` enum (`PLANNED` default / `CURRENTLY_WATCHING` / `WATCHED`), the `library_movies`
+table + `V5__create_library_movies_table.sql` migration (`UNIQUE (user_id, tmdb_id)`, `user_id`
+NOT NULL FK to `users`), a new `TmdbGateway.movie(long)` returning `TmdbMovie` with a
+`TmdbTitleNotFoundException` on a TMDB 404, and three additive `GlobalExceptionHandler` mappings
+(400 invalid status, 409 duplicate, 404 not found). No `SecurityConfig` change:
+`/api/library/**` falls under the existing `anyRequest().authenticated()` rule.
+
+Ten failing test classes committed: `dto/AddMovieRequestValidationTest`, `WatchStatusTest`,
+`LibraryMovieServiceTest` (Mockito, the add algorithm), `RestClientTmdbGatewayMovieTest`
+(MockRestServiceServer, `GET /movie/{id}` mapping + the 404-vs-outage split),
+`LibraryMovieControllerTest` and `LibraryMovieControllerPrincipalConventionTest`
+(`@WebMvcTest` slice per ADR-001), `LibraryMoviesTableConstraintsTest` and
+`LibraryMovieRepositoryTest` (`@SpringBootTest` + H2 PostgreSQL mode),
+`LibraryEndpointsSecurityTest` (Layer 2 real filter chain: AC-6 auth + `SecurityConfig`
+invariant + full-stack AC-3/AC-4/AC-5/AC-7). Expected Phase 1 RED: the test module fails at
+`test-compile` on the unimplemented `com.streamvault.backend.library` symbols and
+`TmdbGateway.movie`, consistent with the story-002/005/006 convention.
+
+Cross-story amendment (documented, not silent): STORY-006's
+`TmdbPackageReadOnlyConventionTest.should_notAddAnyNewFlywayMigration_when_theStoryIsImplemented`
+pinned the migration set at V1..V4. It is updated here to `containsExactly(V1..V5)` with
+`V5__create_library_movies_table.sql` named and the assertion message + class Javadoc reworded to
+record that V5 is STORY-007's `library_movies` table. The persistence-token source scan in the
+same class is unchanged and still green; no STORY-006 AC coverage is dropped.
+
+Spec ambiguity surfaced to Brian (not resolved silently): AC-6 reads "can only add to, and see,
+movies in their own library". STORY-009 owns the user-facing library read surface and viewing is
+not in this story's Out of Scope. This contract implements the **add path only** and treats the
+"see" half as an isolation guarantee (every write bound to `principal.userId()`, every repository
+query user-scoped, tests prove one user's rows are invisible to another's). If Brian wants a
+minimal `GET /api/library/movies` in this story, Test will add the endpoint contract and its
+tests in a revision. Raised in the API contracts doc under "Spec clarification surfaced to Brian".
+
+Next: Dev design review (at least one round required before implementation).
+
 ### Current Phase
 Application Development - User Authentication epic complete and merged (STORY-001, STORY-002). Autonomous Agentic Workflow epic complete (STORY-003, STORY-004). Personal Streaming Library epic defined by PO: STORY-005 through STORY-019 specced and queued for Test and Dev.
 
@@ -175,7 +216,7 @@ Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the q
 
 - [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic - Dev implementation complete, Phase 4 Brian-review fix re-verified by Test (77/77 green, all ACs + invariants covered), Test APPROVED on PR #25, awaiting Brian's review and merge
 - [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Phase 3 complete: Test verified PR #26, full suite green 147/147 via `mvn clean verify`, all AC-1..AC-8 + invariants covered, regression analysis clean, **APPROVED**; awaiting Brian's review and merge
-- [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006
+- [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Phase 1 complete: branch `feature/story-007-add-movie-from-tmdb`, test plan + API contracts + 10 failing test classes committed (RED at `test-compile` as expected), `TmdbPackageReadOnlyConventionTest` migration pin amended to V1..V5 (documented), AC-6 "and see" clarification surfaced to Brian; awaiting Dev design review
 - [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008
 - [ ] STORY-010: Set Movie Watch Status (`docs/specs/story-010-set-movie-watch-status.md`) - prereq STORY-007

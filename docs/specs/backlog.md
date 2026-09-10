@@ -37,3 +37,13 @@ Let users attach their own tags or key/value metadata to library items (for exam
 
 ## Account Settings Epic (carved out during Epic: Personal Streaming Library scoping, 2026-08-31)
 STORY-005 delivers only the rating type preference because the library epic needs it. The broader account-management surface, change password, delete account, update profile or email, remains unspecced. Promote the "Account Settings" item above into a full epic when this work is prioritized.
+
+## TMDB Search Types Beyond Movie and TV (deferred from Epic: Personal Streaming Library, 2026-09-10)
+STORY-006 deliberately narrows TMDB search and browse to movie and TV series results only. TMDB's combined search also returns people, and TMDB additionally exposes dedicated search endpoints for other entity types. STORY-006 discards everything that is not a movie or a series before building a response, because the epic's job is to get titles into a personal library and nothing else consumes these other types yet. Each deferred search type below is a candidate for its own story, or a small "discovery" epic, once there is a feature that actually uses it:
+
+- Person search (actors, directors, crew). Explicitly called out and excluded from STORY-006. Value: let a user find a title by who appears in it or who made it, or browse a person's filmography as a way into the catalog. Most likely first pull from this list.
+- Collection search (named franchises and groupings, for example "The Matrix Collection"). Overlaps with the "Grouping and Collections" item above; if that epic uses TMDB collections to seed user-defined groups, this search becomes a prerequisite for it.
+- Company search (production and distribution companies, for example A24, Pixar). Value: browse or filter the catalog by studio.
+- Keyword search (TMDB's controlled tag vocabulary, for example "based on novel", "dystopia"). Value: thematic discovery beyond free-text title matching.
+
+None of these change what STORY-006 delivers. Pull from this list only when a concrete feature needs one of them; do not spec them speculatively.

@@ -17,6 +17,7 @@ import com.streamvault.backend.auth.exception.GoogleAccountEmailCollisionExcepti
 import com.streamvault.backend.auth.exception.GoogleSignInException;
 import com.streamvault.backend.auth.exception.InvalidCredentialsException;
 import com.streamvault.backend.settings.exception.InvalidRatingTypeException;
+import com.streamvault.backend.tmdb.exception.TmdbUnavailableException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -65,6 +66,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleInvalidRatingType(InvalidRatingTypeException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(TmdbUnavailableException.class)
+    public ResponseEntity<Map<String, String>> handleTmdbUnavailable(TmdbUnavailableException ex) {
+        log.error("TMDB upstream unavailable", ex);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("error",
+                        "The movie database is temporarily unavailable. Please try again in a moment."));
     }
 
     @ExceptionHandler(Exception.class)

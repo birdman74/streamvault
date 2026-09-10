@@ -99,6 +99,63 @@ Spring 6.1+), and validation failures are expected to route through the existing
 handler branch if implementation shows otherwise. Next: Dev implementation - unit tests first, then
 make Test's six failing classes plus the new Dev unit tests pass under `mvn clean verify`.
 
+### STORY-007 Status
+Phase 2 (Dev implementation) complete on branch `feature/story-007-add-movie-from-tmdb`; PR open
+against `main`. Full suite green **225/225** via `mvn clean verify` (JaCoCo 75% instruction gate
+passes). All ten Test-authored failing classes plus six Dev unit-test classes now pass.
+
+New `com.streamvault.backend.library` package: `WatchStatus` (`PLANNED` / `CURRENTLY_WATCHING` /
+`WATCHED`, plain enum), `LibraryMovie` `@Entity` -> `library_movies` (`IDENTITY` id, `user_id`
+NOT NULL, `@Enumerated(STRING)` status, `added_at` mapped to `Instant` exactly as
+`User.createdAt`; public all-args constructor stamps `addedAt`, `protected` no-arg for JPA, getters
+only), `LibraryMovieRepository` (`existsByUserIdAndTmdbId` + `findByUserIdAndTmdbId`, every access
+user-scoped), `dto/AddMovieRequest` (`@NotNull @Positive Long tmdbId`, unconstrained `String
+status`), `dto/LibraryMovieResponse` (`status` as `WatchStatus.name()`), `exception/`
+`InvalidWatchStatusException` (message from `WatchStatus.values()`, mirrors
+`InvalidRatingTypeException`) and `DuplicateLibraryMovieException` (fixed message),
+`LibraryMovieService` (constructor `(LibraryMovieRepository, TmdbGateway)`; `addMovie` runs the
+agreed five-step order - parse status, duplicate pre-check before TMDB, `tmdbGateway.movie`,
+`save` with `DataIntegrityViolationException` -> `DuplicateLibraryMovieException` race backstop,
+map saved row), `LibraryMovieController` (`POST /api/library/movies`, owning id always
+`principal.userId()`).
+
+TMDB package extended (still persistence-free): `dto/TmdbMovie`, `exception/`
+`TmdbTitleNotFoundException` (persistence-free, retains `tmdbId`), `TmdbGateway.movie(long)`, and
+`RestClientTmdbGateway.movie(long)` - its own small fetch (not the `TmdbResponse`-typed shared
+`fetch` helper) with a two-branch catch: `HttpClientErrorException.NotFound` ->
+`TmdbTitleNotFoundException`, every other `RestClientException` / non-2xx -> `TmdbUnavailableException`;
+reuses `parseYear` / `imageBaseUrl`; `search` / `browse` byte-for-byte unchanged.
+`GlobalExceptionHandler` gains three additive `@ExceptionHandler` methods (400
+`InvalidWatchStatusException`, 409 `DuplicateLibraryMovieException`, 404 `TmdbTitleNotFoundException`);
+no existing mapping altered, `TmdbUnavailableException` -> 502 reused unchanged.
+`V5__create_library_movies_table.sql` added exactly as contracted (`BIGSERIAL` id, `user_id BIGINT
+NOT NULL REFERENCES users (id)`, `status VARCHAR(30) NOT NULL`, `added_at TIMESTAMP NOT NULL
+DEFAULT now()`, `CONSTRAINT uq_library_movies_user_tmdb UNIQUE (user_id, tmdb_id)`). No
+`SecurityConfig`, `application.yml`, or `.env.example` change.
+
+Dev lower-level unit tests added below Test's integration boundary:
+`InvalidWatchStatusExceptionTest`, `DuplicateLibraryMovieExceptionTest`,
+`TmdbTitleNotFoundExceptionTest` (message constants + `tmdbId` retention),
+`LibraryMovieTest` (entity: `addedAt` stamped, `id` null pre-persist, `protected` no-arg ctor,
+getters only), `LibraryMovieServiceOrderingTest` (unsupported status rejected before the duplicate
+check with `verifyNoInteractions`; response built from the saved entity carrying `id` / `addedAt` /
+`status` name), `RestClientTmdbGatewayMovieEdgeCasesTest` (403 stays unavailable; empty `{}` body
+-> null fields, no NPE).
+
+Deviation from the agreed design (test-mechanics only, flagged for Test's Phase 3 review): the two
+Test-authored `@SpringBootTest` classes `LibraryMovieRepositoryTest` and
+`LibraryMoviesTableConstraintsTest` seed fixed-email `users` rows in `@BeforeEach` with no
+rollback. The class shares one cached context and one in-memory H2 database across methods, so from
+the second method on the seed collided on `users.email` (`DataIntegrityViolationException` in
+`setUp` / `seedUsers`), failing 8 of their combined 10 methods regardless of production code. Fix
+applied: `@Transactional` on both classes (Spring's standard per-method auto-rollback) plus a
+Javadoc line explaining why. No assertion, datasource, or test intent changed; the schema-level
+violations under test are raised synchronously by H2 at statement execution so the surrounding
+rollback does not mask them. Both classes green in isolation (4/4 and 6/6) and in the full run.
+
+Spec interpretation unchanged from Phase 1: AC-6 "and see" is implemented as an isolation
+guarantee (add path only; STORY-009 owns the read surface) pending Brian's call.
+
 ### STORY-007 Phase 1 Record
 Phase 1 (Test goes first) complete on branch `feature/story-007-add-movie-from-tmdb`, cut from an
 up-to-date `main` (STORY-006 merged, PR #26, commit 33fb2a1). Test plan
@@ -241,7 +298,7 @@ Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the q
 
 - [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic - Dev implementation complete, Phase 4 Brian-review fix re-verified by Test (77/77 green, all ACs + invariants covered), Test APPROVED on PR #25, awaiting Brian's review and merge
 - [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Phase 3 complete: Test verified PR #26, full suite green 147/147 via `mvn clean verify`, all AC-1..AC-8 + invariants covered, regression analysis clean, **APPROVED**; awaiting Brian's review and merge
-- [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Phase 1 complete: branch `feature/story-007-add-movie-from-tmdb`, test plan + API contracts + 10 failing test classes committed (RED at `test-compile` as expected), `TmdbPackageReadOnlyConventionTest` migration pin amended to V1..V5 (documented), AC-6 "and see" clarification surfaced to Brian; Dev agreed on design review round 1 (`docs/specs/design/story-007-agreed.md`), no blocking concerns, three implementation points recorded for Brian; awaiting Dev implementation
+- [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Phase 2 complete: Dev implemented the `library` package (`WatchStatus`, `LibraryMovie` `@Entity`, `LibraryMovieRepository`, `LibraryMovieService`, `LibraryMovieController`, DTOs, exceptions), extended `TmdbGateway`/`RestClientTmdbGateway` with `movie(long)`, added `V5__create_library_movies_table.sql`, three additive `GlobalExceptionHandler` mappings, and six Dev unit-test classes; full suite green 225/225 via `mvn clean verify`, JaCoCo 75% gate passes; `@Transactional` added to Test's `LibraryMovieRepositoryTest` / `LibraryMoviesTableConstraintsTest` as a documented test-mechanics fix (shared cached context + one in-memory H2 + fixed-email `@BeforeEach` seed collided on `users.email` from the second method on) - flagged for Test's Phase 3 review; PR open targeting `main`; awaiting Test verification
 - [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008
 - [ ] STORY-010: Set Movie Watch Status (`docs/specs/story-010-set-movie-watch-status.md`) - prereq STORY-007

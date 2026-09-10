@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.streamvault.backend.user.User;
 import com.streamvault.backend.user.UserRepository;
@@ -24,8 +25,13 @@ import com.streamvault.backend.user.UserRepository;
  * Covers the cross-story repository invariant - new finder methods return "no match" without
  * throwing - plus a save/find round-trip carrying every field including {@code status} (AC-2), and
  * that one user's rows are invisible to a query for another user's id (AC-6).
+ *
+ * <p>{@code @Transactional} so each method's {@code @BeforeEach} user seed rolls back afterwards -
+ * the class shares one cached context and one in-memory H2 database across methods, and the seeded
+ * users use fixed emails, so without rollback the second method collides on {@code users.email}.
  */
 @SpringBootTest
+@Transactional
 class LibraryMovieRepositoryTest {
 
     @DynamicPropertySource

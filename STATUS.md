@@ -138,7 +138,32 @@ query user-scoped, tests prove one user's rows are invisible to another's). If B
 minimal `GET /api/library/movies` in this story, Test will add the endpoint contract and its
 tests in a revision. Raised in the API contracts doc under "Spec clarification surfaced to Brian".
 
-Next: Dev design review (at least one round required before implementation).
+Phase 1 design review complete: Dev agreed on round 1
+(`docs/specs/design/story-007-agreed.md`), no blocking concerns against AC-1..AC-7 or the
+cross-story invariants. The design closely mirrors established precedent (story-005
+`RatingType`/`parseRatingType`/`InvalidRatingTypeException` for the `WatchStatus` parse path,
+story-006 `TmdbGateway`/`RestClientTmdbGateway`/`MockRestServiceServer` seam for `movie(long)`,
+the `users` table conventions for `library_movies`, ADR-001 Layer 1/2 for the tests). Three
+non-obvious implementation points recorded for Brian: (1) `movie(long)` needs a finer catch than
+the shared `fetch(...)` helper - a TMDB 404 maps to `TmdbTitleNotFoundException` via a specific
+`HttpClientErrorException.NotFound` catch while 401/403/429/5xx/transport stay
+`TmdbUnavailableException`; it gets its own small private fetch rather than routing through the
+`TmdbResultPage`-typed helper; (2) the unique-constraint race backstop relies on
+`SimpleJpaRepository.save` flushing the `IDENTITY` insert within its own transaction so the
+`DataIntegrityViolationException` surfaces from `save(...)` and is caught there; (3)
+`added_at TIMESTAMP` mapped to `Instant` reuses the existing `User.createdAt` pattern verbatim,
+no new schema convention. The AC-6 "and see" spec interpretation Test surfaced is noted as
+pending Brian's decision but does not block the add path. Dev will add lower-level unit tests
+below Test's integration boundary: exception message constants
+(`InvalidWatchStatusExceptionTest` mirroring `InvalidRatingTypeExceptionTest`,
+`DuplicateLibraryMovieException`, `TmdbTitleNotFoundException` id retention), the service
+ordering nuance (invalid status rejected before the duplicate check), DTO-side response mapping
+(`status` as `name()` string, null `releaseYear`/`posterUrl` pass-through), the `LibraryMovie`
+entity shape (constructor sets `addedAt`, getters only), and a `RestClientTmdbGatewayMovieTest`
+403 case plus an empty-body case.
+
+Next: Dev implementation - unit tests first, then make Test's ten failing classes plus the new
+Dev unit tests pass under `mvn clean verify`.
 
 ### Current Phase
 Application Development - User Authentication epic complete and merged (STORY-001, STORY-002). Autonomous Agentic Workflow epic complete (STORY-003, STORY-004). Personal Streaming Library epic defined by PO: STORY-005 through STORY-019 specced and queued for Test and Dev.
@@ -216,7 +241,7 @@ Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the q
 
 - [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic - Dev implementation complete, Phase 4 Brian-review fix re-verified by Test (77/77 green, all ACs + invariants covered), Test APPROVED on PR #25, awaiting Brian's review and merge
 - [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Phase 3 complete: Test verified PR #26, full suite green 147/147 via `mvn clean verify`, all AC-1..AC-8 + invariants covered, regression analysis clean, **APPROVED**; awaiting Brian's review and merge
-- [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Phase 1 complete: branch `feature/story-007-add-movie-from-tmdb`, test plan + API contracts + 10 failing test classes committed (RED at `test-compile` as expected), `TmdbPackageReadOnlyConventionTest` migration pin amended to V1..V5 (documented), AC-6 "and see" clarification surfaced to Brian; awaiting Dev design review
+- [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Phase 1 complete: branch `feature/story-007-add-movie-from-tmdb`, test plan + API contracts + 10 failing test classes committed (RED at `test-compile` as expected), `TmdbPackageReadOnlyConventionTest` migration pin amended to V1..V5 (documented), AC-6 "and see" clarification surfaced to Brian; Dev agreed on design review round 1 (`docs/specs/design/story-007-agreed.md`), no blocking concerns, three implementation points recorded for Brian; awaiting Dev implementation
 - [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008
 - [ ] STORY-010: Set Movie Watch Status (`docs/specs/story-010-set-movie-watch-status.md`) - prereq STORY-007

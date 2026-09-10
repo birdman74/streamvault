@@ -22,8 +22,11 @@ import org.junit.jupiter.api.Test;
  *       persistence API. The tokens checked are import/type level ({@code jakarta.persistence},
  *       {@code org.springframework.data}, {@code @Transactional}, {@code EntityManager},
  *       {@code JdbcTemplate}, {@code MongoTemplate}) so they do not false-match explanatory prose.</li>
- *   <li>The Flyway migration set stays at exactly V1..V4 -- this story introduces no schema
- *       change, and a later edit must not quietly add persistence under this feature.</li>
+ *   <li>The Flyway migration set is pinned to an explicit list, so a later edit cannot quietly add
+ *       persistence under a TMDB-read feature. STORY-007 (Add Movie from TMDB to Library) legitimately
+ *       adds {@code V5__create_library_movies_table.sql} for its own {@code library_movies} table;
+ *       that one entry is added here as a documented cross-story amendment, not a silent change, and
+ *       the guard otherwise still holds.</li>
  * </ol>
  *
  * Until Dev creates the {@code tmdb} main package this test fails on the first assertion, which is
@@ -78,12 +81,15 @@ class TmdbPackageReadOnlyConventionTest {
         }
 
         assertThat(migrations)
-                .as("story-006 introduces no schema change; the migration set must stay at V1..V4")
+                .as("the migration set is pinned; story-006 adds nothing, and STORY-007 adds only "
+                        + "V5__create_library_movies_table.sql for its library_movies table "
+                        + "(documented amendment, see class javadoc)")
                 .containsExactly(
                         "V1__create_users_table.sql",
                         "V2__add_google_id_to_users.sql",
                         "V3__add_users_password_or_google_check.sql",
-                        "V4__add_rating_type_to_users.sql");
+                        "V4__add_rating_type_to_users.sql",
+                        "V5__create_library_movies_table.sql");
     }
 
     private Stream<JavaSource> javaSourcesUnder(Path root) throws IOException {

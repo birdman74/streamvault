@@ -100,9 +100,39 @@ handler branch if implementation shows otherwise. Next: Dev implementation - uni
 make Test's six failing classes plus the new Dev unit tests pass under `mvn clean verify`.
 
 ### STORY-007 Status
-Phase 2 (Dev implementation) complete on branch `feature/story-007-add-movie-from-tmdb`; PR open
-against `main`. Full suite green **225/225** via `mvn clean verify` (JaCoCo 75% instruction gate
-passes). All ten Test-authored failing classes plus six Dev unit-test classes now pass.
+Phase 3 (Test final PR verification) complete on branch `feature/story-007-add-movie-from-tmdb`,
+PR #28 against `main` - **APPROVED**. Pulled the branch, ran `mvn clean verify`: full suite green
+**225/225**, 0 failures, 0 errors, JaCoCo 75% instruction gate met ("All coverage checks have been
+met"). Every AC-1..AC-7 and every cross-story invariant is covered by at least one passing test.
+
+Regression analysis of the Dev diff (three shared-infrastructure touch points, all additive):
+`GlobalExceptionHandler` gained three `@ExceptionHandler` methods with no existing mapping altered -
+existing mappings stay green via `AccountSettingsControllerTest`, `AuthControllerGoogleTest`,
+`TmdbControllerTest`; `TmdbGateway` gained `movie(long)` with `search` / `browse` untouched -
+`RestClientTmdbGatewayTest`, `TmdbCatalogServiceTest`, `TmdbControllerTest`,
+`TmdbEndpointsSecurityTest` all re-ran green; `V5__create_library_movies_table.sql` is the first FK
+into `users` - every `@SpringBootTest` context load runs Flyway + `ddl-auto=validate` and passed,
+`UserTableConstraintsTest` green, and no user-deletion path exists anywhere in the codebase so no
+cascade regression is reachable yet (recorded as a cross-story invariant to revisit when
+STORY-011 / account deletion lands). No additional regression tests were required; the additive
+changes are fully covered by the Phase 1 tests plus the pre-existing suite re-running green.
+
+Dev's flagged deviation (`@Transactional` on Test's `LibraryMovieRepositoryTest` and
+`LibraryMoviesTableConstraintsTest`) reviewed and accepted: it fixes a real test-isolation defect
+in the Phase 1 tests (fixed-email `users` seed in `@BeforeEach` collided across methods sharing one
+cached context and one in-memory H2 database). Spring's standard per-method auto-rollback; no
+assertion, datasource, or intent changed; schema-level violations under test are raised
+synchronously by H2 so rollback does not mask them. Both classes green (4/4, 6/6) in isolation and
+in the full run. Minor note, not a blocker: with `@Transactional` the repository round-trip test
+saves and reads within one persistence context, so `status` column read-back fidelity is proven
+instead by `LibraryEndpointsSecurityTest` (end-to-end status persist) and the `validate` context
+load.
+
+AC-6 "and see": implemented as an isolation guarantee (add path only, every write bound to
+`principal.userId()`, every repository access user-scoped, cross-user invisibility proven by test);
+the user-facing read surface is formally deferred to STORY-009. This interpretation was surfaced to
+Brian in Phase 1 and agreed in `story-007-agreed.md`; called out again here so Brian makes the
+final call at merge.
 
 New `com.streamvault.backend.library` package: `WatchStatus` (`PLANNED` / `CURRENTLY_WATCHING` /
 `WATCHED`, plain enum), `LibraryMovie` `@Entity` -> `library_movies` (`IDENTITY` id, `user_id`
@@ -298,7 +328,7 @@ Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the q
 
 - [ ] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - prerequisite for STORY-015, tracked outside the epic - Dev implementation complete, Phase 4 Brian-review fix re-verified by Test (77/77 green, all ACs + invariants covered), Test APPROVED on PR #25, awaiting Brian's review and merge
 - [ ] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Phase 3 complete: Test verified PR #26, full suite green 147/147 via `mvn clean verify`, all AC-1..AC-8 + invariants covered, regression analysis clean, **APPROVED**; awaiting Brian's review and merge
-- [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Phase 2 complete: Dev implemented the `library` package (`WatchStatus`, `LibraryMovie` `@Entity`, `LibraryMovieRepository`, `LibraryMovieService`, `LibraryMovieController`, DTOs, exceptions), extended `TmdbGateway`/`RestClientTmdbGateway` with `movie(long)`, added `V5__create_library_movies_table.sql`, three additive `GlobalExceptionHandler` mappings, and six Dev unit-test classes; full suite green 225/225 via `mvn clean verify`, JaCoCo 75% gate passes; `@Transactional` added to Test's `LibraryMovieRepositoryTest` / `LibraryMoviesTableConstraintsTest` as a documented test-mechanics fix (shared cached context + one in-memory H2 + fixed-email `@BeforeEach` seed collided on `users.email` from the second method on) - flagged for Test's Phase 3 review; PR open targeting `main`; awaiting Test verification
+- [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Phase 3 complete: Test pulled `feature/story-007-add-movie-from-tmdb`, ran `mvn clean verify` (225/225 green, 0 failures/errors, JaCoCo 75% gate met), ran regression analysis on the Dev diff (three additive shared-infra touch points - `GlobalExceptionHandler` mappings, `TmdbGateway.movie(long)`, `V5` migration - all covered by pre-existing suite re-running green plus Phase 1 tests; no new regression tests required), reviewed and accepted Dev's `@Transactional` test-isolation fix, confirmed every AC-1..AC-7 and every invariant is covered by a passing test. **APPROVED** on PR #28 via `gh pr review --approve`; AC-6 "and see" read surface deferred to STORY-009 per the agreed contract - Brian's call at merge. Awaiting Brian's review and merge
 - [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008
 - [ ] STORY-010: Set Movie Watch Status (`docs/specs/story-010-set-movie-watch-status.md`) - prereq STORY-007

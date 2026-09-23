@@ -17,8 +17,10 @@ import com.streamvault.backend.auth.exception.GoogleAccountEmailCollisionExcepti
 import com.streamvault.backend.auth.exception.GoogleSignInException;
 import com.streamvault.backend.auth.exception.InvalidCredentialsException;
 import com.streamvault.backend.library.exception.DuplicateLibraryMovieException;
+import com.streamvault.backend.library.exception.DuplicateLibrarySeriesException;
 import com.streamvault.backend.library.exception.InvalidWatchStatusException;
 import com.streamvault.backend.settings.exception.InvalidRatingTypeException;
+import com.streamvault.backend.tmdb.exception.TmdbSeriesNotFoundException;
 import com.streamvault.backend.tmdb.exception.TmdbTitleNotFoundException;
 import com.streamvault.backend.tmdb.exception.TmdbUnavailableException;
 
@@ -87,6 +89,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleTmdbTitleNotFound(TmdbTitleNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Map.of("error", "We could not find that movie on TMDB."));
+    }
+
+    @ExceptionHandler(DuplicateLibrarySeriesException.class)
+    public ResponseEntity<Map<String, String>> handleDuplicateLibrarySeries(DuplicateLibrarySeriesException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(TmdbSeriesNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleTmdbSeriesNotFound(TmdbSeriesNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "We could not find that series on TMDB."));
     }
 
     @ExceptionHandler(TmdbUnavailableException.class)

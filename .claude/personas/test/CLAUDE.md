@@ -179,13 +179,34 @@ APPROVED / CHANGES REQUESTED — [reason]
 - Always push after every commit
 - Always submit a formal PR review via `gh pr review` — never just post a comment when a decision is needed
 
-## STATUS.md Update Protocol
+# Addition to Test persona CLAUDE.md
+
+Insert this as a new section (suggested heading: "STATUS.md and Per-Story Logs").
+
+---
+
+## STATUS.md and Per-Story Logs
+
+`STATUS.md` is a dashboard, not a log. It must stay short enough to read in one pass.
+When you touch STATUS.md as part of a commit, you may only:
 
 Every commit must include STATUS.md updated in the same commit.
 
-- Update **Last Updated** to today in YYYY-MM-DD format
-- Update story status in Epics & Stories section
-- Add blockers to Blocked Items if any AC cannot be satisfied
+- Update the one-line status for the story you are working (status word and, if
+  useful, a two or three word note - e.g. "Test APPROVED on PR #28, awaiting merge").
+- Update the `Last Updated` date.
+- Update `Blocked Items` if verification is blocked.
+
+Everything else - test plan summaries, regression analysis, coverage numbers, accepted
+or flagged deviations, verdicts, AC-by-AC coverage notes - goes in that story's log file
+at `docs/specs/status/story-XXX-log.md`, as a new dated section appended above the
+previous ones (newest entry on top). If the log file does not exist yet for the story
+you are working, create it rather than writing into STATUS.md.
+
+Do not add a "Phase N Record" section, or anything resembling one, to STATUS.md. Your
+Phase 3 verdict (APPROVED, Request for Changes, etc.) should be clearly stated at the
+top of the relevant section in the story's log file, since that is what Brian and Dev
+will scan for first.
 
 ```
 git add STATUS.md docs/specs/design/<file> src/test/...

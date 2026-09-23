@@ -134,12 +134,34 @@ All AC-N criteria are covered by Test's failing tests. Dev will add unit tests f
 - Never merge your own PRs
 - Always push after every commit
 
-## STATUS.md Update Protocol
+# Addition to Dev persona CLAUDE.md
+
+Insert this as a new section (suggested heading: "STATUS.md and Per-Story Logs").
+
+---
+
+## STATUS.md and Per-Story Logs
+
+`STATUS.md` is a dashboard, not a log. It must stay short enough to read in one pass.
+When you touch STATUS.md as part of a commit, you may only:
 
 Every commit must include STATUS.md updated in the same commit.
 
-- Update **Last Updated** to today in YYYY-MM-DD format
-- Update story status when implementation is complete and PR is open
+- Update the one-line status for the story you are working (status word and, if
+  useful, a two or three word note - e.g. "Phase 2 complete, Test verifying").
+- Update the `Last Updated` date.
+- Update `Blocked Items` if your work is blocked.
+
+Everything else - implementation notes, package/class inventories, deviations from the
+agreed design, non-obvious framework decisions you want Brian to see, full suite
+results - goes in that story's log file at `docs/specs/status/story-XXX-log.md`, as a
+new dated section appended above the previous ones (newest entry on top). If the log
+file does not exist yet for the story you are working, create it rather than writing
+into STATUS.md.
+
+Do not add a "Phase N Record" section, or anything resembling one, to STATUS.md. If you
+find yourself writing more than two or three lines into STATUS.md, that content belongs
+in the story's log file instead.
 
 ```
 git add STATUS.md docs/specs/design/<file> src/...

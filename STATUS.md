@@ -101,9 +101,9 @@ Deferred work parked in `docs/specs/backlog.md`: Testcontainers/Docker-in-Docker
 ### Epic: Personal Streaming Library
 Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the queue picks up STORY-005
 
-- [x] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - Test APPROVED on PR #25 (77/77 green, all ACs + invariants covered), awaiting Brian's review and merge. Full trace: `docs/specs/status/story-005-log.md`
-- [x] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Test APPROVED on PR #26 (147/147 green, all ACs + invariants covered), awaiting Brian's review and merge. Full trace: `docs/specs/status/story-006-log.md`
-- [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Test APPROVED on PR #28 (225/225 green, all ACs + invariants covered); AC-6 "and see" read surface deferred to STORY-009, Brian's call at merge. Full trace: `docs/specs/status/story-007-log.md`
+- [x] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - Completed - Full trace: `docs/specs/status/story-005-log.md`
+- [x] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Completed - Full trace: `docs/specs/status/story-006-log.md`
+- [ ] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Test added coverage per Brian's Changes Requested review on PR #28, awaiting merge - Full trace: `docs/specs/status/story-007-log.md`
 - [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006
 - [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008
 - [ ] STORY-010: Set Movie Watch Status (`docs/specs/story-010-set-movie-watch-status.md`) - prereq STORY-007

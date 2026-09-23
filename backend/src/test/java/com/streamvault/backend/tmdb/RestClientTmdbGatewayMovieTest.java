@@ -158,4 +158,26 @@ class RestClientTmdbGatewayMovieTest {
         assertThatThrownBy(() -> gateway.movie(27205L))
                 .isInstanceOf(TmdbUnavailableException.class);
     }
+
+    /**
+     * Flagged by Brian's PR #28 Changes Requested review on {@code RestClientTmdbGateway} line 108:
+     * the {@code json == null} branch had no test. Distinct from
+     * {@code RestClientTmdbGatewayMovieEdgeCasesTest.should_returnAMovieWithNullFields_when_tmdbReturnsAnEmptyJsonBody}
+     * (a {@code "{}"} body, which Jackson deserializes into a non-null {@code TmdbMovieJson} with null
+     * fields): a genuinely empty response body makes {@code .body(TmdbMovieJson.class)} itself return
+     * {@code null} (Spring's {@code HttpMessageConverterExtractor} short-circuits on an empty message
+     * body before invoking the converter), which is the branch this pins.
+     */
+    @Test
+    void should_returnAMovieWithNullFields_when_tmdbRespondsWithNoBody() {
+        server.expect(requestTo(containsString("/movie/27205")))
+                .andRespond(withStatus(HttpStatus.OK));
+
+        TmdbMovie movie = gateway.movie(27205L);
+
+        assertThat(movie.tmdbId()).isEqualTo(27205L);
+        assertThat(movie.title()).isNull();
+        assertThat(movie.releaseYear()).isNull();
+        assertThat(movie.posterUrl()).isNull();
+    }
 }

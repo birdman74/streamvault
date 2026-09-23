@@ -10,6 +10,37 @@ PR: #28
 
 ---
 
+## 2026-09-23: Phase 4 — coverage added for Brian's Changes Requested review
+
+Brian posted a Changes Requested review on PR #28 (`99421d0`), inline comment on
+`backend/src/main/java/com/streamvault/backend/tmdb/RestClientTmdbGateway.java` line 108:
+"This branch of logic is not covered by any tests. Please ensure this is covered." The line is the
+`if (json == null) { return new TmdbMovie(tmdbId, null, null, null); }` branch inside
+`RestClientTmdbGateway.movie(long)` - the case where `.body(TmdbMovieJson.class)` itself returns
+`null` because TMDB's response has a genuinely empty body. This is distinct from the already-covered
+`"{}"` case (`RestClientTmdbGatewayMovieEdgeCasesTest.should_returnAMovieWithNullFields_when_tmdbReturnsAnEmptyJsonBody`),
+where Jackson successfully deserializes an object with null fields; Spring's
+`HttpMessageConverterExtractor` short-circuits on a genuinely empty message body and returns `null`
+before the converter ever runs, and no existing test exercised that path.
+
+Added `should_returnAMovieWithNullFields_when_tmdbRespondsWithNoBody` to the Test-owned
+`RestClientTmdbGatewayMovieTest`, using the same `MockRestServiceServer` pattern as the rest of the
+class: `withStatus(HttpStatus.OK)` with no `.body(...)` call, so `MockRestServiceServer` returns a
+true zero-byte body.
+
+**Outcome: this is a coverage gap, not a behavior defect.** `mvn -Dtest=RestClientTmdbGatewayMovieTest test`
+shows the new test passes against the current implementation unmodified (10/10 in that class) - the
+`json == null` branch already does the right thing, it simply had no test pinning it. Per the Test
+persona's "never modify implementation code" rule, no production code was touched. Ran
+`mvn clean verify` for the full suite: **226 tests, 0 failures, 0 errors** (225 prior + 1 new), JaCoCo
+75% instruction gate met ("All coverage checks have been met"), BUILD SUCCESS.
+
+Committed the new test plus this log/STATUS.md update and pushed to
+`feature/story-007-add-movie-from-tmdb`. Per the Phase 4 workflow, the push itself is the trigger -
+no `gh pr review` submitted (GitHub blocks the bot account from reviewing its own PR).
+
+---
+
 ## Phase 3: Test final PR verification
 
 Complete on branch `feature/story-007-add-movie-from-tmdb`, PR #28 against `main` -

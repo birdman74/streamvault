@@ -5,7 +5,7 @@
 | AC | Criterion | Test(s) |
 |---|---|---|
 | AC-1 | From a TMDB series search or browse result, a signed-in user can add that series to their own library | `LibrarySeriesControllerTest.should_return201WithTheCreatedEntryIncludingSeasonsAndEpisodes_when_seriesIsAdded`; `LibrarySeriesControllerTest.should_threadAuthenticatedUserIdIntoTheService_when_adding`; `LibrarySeriesEndpointsSecurityTest.should_return201_when_addSeriesIsCalledWithAValidJwt`; `LibrarySeriesEndpointsSecurityTest.should_return401_when_addSeriesIsCalledWithoutAuthentication`; `LibrarySeriesServiceTest.should_persistSeriesLevelCatalogDataAndFullStructure_when_seriesIsAddedByAuthenticatedUser` |
-| AC-2 | Stores every season and, within each season, every episode, each identified and labeled (season number, episode number, episode title where TMDB provides one) | `RestClientTmdbGatewaySeriesTest.should_fetchEpisodesForEverySeasonListedByTmdb_when_seriesHasMultipleSeasons`; `RestClientTmdbGatewaySeriesTest.should_preserveEpisodeAndSeasonNumbering_when_mappingTheStructure`; `RestClientTmdbGatewaySeriesTest.should_mapEpisodeTitleAsNull_when_tmdbOmitsEpisodeName`; `LibrarySeriesServiceTest.should_storeEverySeasonAndEpisodeFromTmdb_when_seriesHasMultipleSeasons`; `LibrarySeriesServiceTest.should_storeNullEpisodeTitle_when_tmdbOmitsTheEpisodeName`; `LibrarySeriesControllerTest.should_return201WithTheCreatedEntryIncludingSeasonsAndEpisodes_when_seriesIsAdded` (asserts nested `seasons[].episodes[]` shape); `LibrarySeriesRepositoryTest.should_roundTripASeriesWithSeasonsAndEpisodes_when_savedThenLookedUpByUserAndTmdbId`; `LibrarySeriesTablesConstraintsTest.should_rejectSecondSeasonRow_when_sameSeriesHasSameSeasonNumberTwice`; `LibrarySeriesTablesConstraintsTest.should_rejectSecondEpisodeRow_when_sameSeasonHasSameEpisodeNumberTwice`; `LibrarySeriesTablesConstraintsTest.should_acceptEpisodeRow_when_titleIsNull` |
+| AC-2 | Stores every season and, within each season, every episode, each identified and labeled (season number, episode number, episode title where TMDB provides one) | `RestClientTmdbGatewaySeriesTest.should_fetchEpisodesForEverySeasonListedByTmdb_when_seriesHasMultipleSeasons`; `RestClientTmdbGatewaySeriesTest.should_preserveEpisodeAndSeasonNumbering_when_mappingTheStructure`; `RestClientTmdbGatewaySeriesTest.should_mapEpisodeTitleAsNull_when_tmdbOmitsEpisodeName`; `RestClientTmdbGatewaySeriesTest.should_batchSeasonFetchesInGroupsOfAtMost20_when_seriesHasMoreThan20Seasons`; `LibrarySeriesServiceTest.should_storeEverySeasonAndEpisodeFromTmdb_when_seriesHasMultipleSeasons`; `LibrarySeriesServiceTest.should_storeNullEpisodeTitle_when_tmdbOmitsTheEpisodeName`; `LibrarySeriesControllerTest.should_return201WithTheCreatedEntryIncludingSeasonsAndEpisodes_when_seriesIsAdded` (asserts nested `seasons[].episodes[]` shape); `LibrarySeriesRepositoryTest.should_roundTripASeriesWithSeasonsAndEpisodes_when_savedThenLookedUpByUserAndTmdbId`; `LibrarySeriesTablesConstraintsTest.should_rejectSecondSeasonRow_when_sameSeriesHasSameSeasonNumberTwice`; `LibrarySeriesTablesConstraintsTest.should_rejectSecondEpisodeRow_when_sameSeasonHasSameEpisodeNumberTwice`; `LibrarySeriesTablesConstraintsTest.should_acceptEpisodeRow_when_titleIsNull` |
 | AC-3 | Enough series-level TMDB catalog data is stored to display the entry without a further TMDB call: at minimum TMDB id, title, first-air year, poster reference | `LibrarySeriesServiceTest.should_persistSeriesLevelCatalogDataAndFullStructure_when_seriesIsAddedByAuthenticatedUser`; `LibrarySeriesServiceTest.should_storeNullFirstAirYearAndPoster_when_tmdbOmitsThem`; `LibrarySeriesControllerTest.should_return201WithTheCreatedEntryIncludingSeasonsAndEpisodes_when_seriesIsAdded` (asserts `tmdbId`, `title`, `firstAirYear`, `posterUrl`, `addedAt`); `RestClientTmdbGatewaySeriesTest.should_mapTheSeriesLevelCatalogData_when_tmdbReturnsTheSeries`; `RestClientTmdbGatewaySeriesTest.should_returnNullPoster_when_tmdbOmitsPosterPath`; `RestClientTmdbGatewaySeriesTest.should_returnNullFirstAirYear_when_tmdbFirstAirDateIsMissingOrEmpty`; `LibrarySeriesRepositoryTest.should_roundTripASeriesWithSeasonsAndEpisodes_when_savedThenLookedUpByUserAndTmdbId`; `LibrarySeriesTablesConstraintsTest.should_acceptSeriesRow_when_firstAirYearAndPosterUrlAreNull` |
 | AC-4 | On add, every episode of the series starts with status Planned, so the series and every season roll up to Planned (roll-up computation itself is STORY-012) | `LibrarySeriesServiceTest.should_setEveryEpisodeStatusToPlanned_when_seriesIsAdded`; `LibrarySeriesControllerTest.should_return201WithTheCreatedEntryIncludingSeasonsAndEpisodes_when_seriesIsAdded` (asserts `seasons[].episodes[].status == "PLANNED"`); `LibrarySeriesEndpointsSecurityTest.should_setEveryEpisodeToPlannedEndToEnd_when_seriesIsAdded`; `LibrarySeriesTablesConstraintsTest.should_rejectEpisodeRow_when_statusIsNull` |
 | AC-5 | A given TMDB series can appear at most once in a single user's library; adding a series already present returns a clear, user-facing error and creates no duplicate | `LibrarySeriesServiceTest.should_throwDuplicateLibrarySeriesException_when_userAlreadyHasThatSeries`; `LibrarySeriesServiceTest.should_checkForDuplicateBeforeCallingTmdb_when_addingASeries`; `LibrarySeriesServiceTest.should_translateUniqueConstraintViolationToDuplicateError_when_saveRaces`; `LibrarySeriesControllerTest.should_return409WithClearMessage_when_seriesAlreadyInLibrary`; `LibrarySeriesTablesConstraintsTest.should_rejectSecondSeriesRow_when_sameUserAddsSameTmdbIdTwice`; `LibrarySeriesEndpointsSecurityTest.should_persistAcrossUsersIndependently_when_twoUsersAddTheSameSeries` (third add by the same user -> 409) |
@@ -18,8 +18,10 @@
 
 This story touches shared infrastructure: it extends the `library` package with the **first
 multi-table aggregate** (three tables, two levels of FK/cascade), adds a **second `TmdbGateway`
-read method** made of **two chained TMDB calls**, reuses the **shared `WatchStatus` enum**
-unchanged, and adds **two new `GlobalExceptionHandler` mappings**.
+read method** made of a **series-detail call plus one or more batched `append_to_response`
+season-episode calls** (revised in design round 1 from N sequential per-season calls — see
+`story-008-test-revision-r1.md`), reuses the **shared `WatchStatus` enum** unchanged, and adds **two
+new `GlobalExceptionHandler` mappings**.
 
 | Invariant | Test(s) |
 |---|---|
@@ -54,12 +56,17 @@ Layers mirror story-007's established pattern, extended for the season/episode t
 
 - **Gateway unit tests (`tmdb/RestClientTmdbGatewaySeriesTest`)** — `MockRestServiceServer.bindTo`,
   no Spring context, extends the story-007 `RestClientTmdbGatewayMovieTest` pattern to a
-  **two-stage** call sequence: one `GET /tv/{id}` expectation for series-level data, then one
-  `GET /tv/{id}/season/{n}` expectation per season for episodes, registered on the same
-  `MockRestServiceServer` in call order. Pins the series-level mapping, the per-season episode
-  mapping, season-number and episode-number preservation, season `0` handling (AC-9), null
-  `firstAirYear` / `posterUrl` / episode `title`, and the failure split: a `404` on the series call
-  -> `TmdbSeriesNotFoundException`; any other non-2xx / transport error on either call ->
+  **series-detail call plus batched episode call(s)** sequence: one `GET /tv/{id}` expectation for
+  series-level data (and the season-number list), then one
+  `GET /tv/{id}?append_to_response=season/{n1},season/{n2},...` expectation per batch of up to 20
+  season numbers, registered on the same `MockRestServiceServer` in call order. Revised in design
+  round 1 from a per-season `GET /tv/{id}/season/{n}` call sequence per Dev's feedback — see
+  `story-008-test-revision-r1.md`. Pins the series-level mapping, the batched episode mapping,
+  season-number and episode-number preservation, season `0` handling (AC-9), null `firstAirYear` /
+  `posterUrl` / episode `title`, the >20-season chunking boundary (a 25-season series makes exactly
+  two batch calls, one for seasons 1-20 and one for seasons 21-25), the zero-season case (no batch
+  call made at all), and the failure split: a `404` on the series call -> `TmdbSeriesNotFoundException`;
+  any other non-2xx / transport error on either the series call or a batch call ->
   `TmdbUnavailableException`. Fixed JSON literals, fully deterministic.
 
 - **Service unit tests (`library/LibrarySeriesServiceTest`)** — Mockito, mocks

@@ -2,6 +2,7 @@ package com.streamvault.backend.tmdb;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -11,6 +12,9 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,14 +34,15 @@ import com.streamvault.backend.tmdb.exception.TmdbUnavailableException;
  * {@code TmdbEpisode}, and {@code TmdbSeriesNotFoundException} do not exist yet; this test is
  * expected to fail to compile until Dev implements them.
  *
- * <p>Same {@link MockRestServiceServer} pattern as story-007's {@code RestClientTmdbGatewayMovieTest},
- * extended to the two-stage call sequence this method makes: one {@code GET /tv/{id}} expectation
- * for series-level data, then one {@code GET /tv/{id}/season/{n}} expectation per season for
- * episodes, registered on the same server in call order. Pins the series-level mapping (AC-3), the
- * per-season episode mapping and numbering (AC-2), season {@code 0} handling (AC-9), the null rules
- * for {@code firstAirYear} / {@code posterUrl} / episode {@code title}, and the failure split: a
+ * <p>Revised in design round 1 (see {@code story-008-test-revision-r1.md}) per Dev's feedback:
+ * episode detail is fetched via one {@code GET /tv/{id}?append_to_response=season/{n1},season/{n2},...}
+ * call per batch of up to 20 season numbers, instead of one {@code GET /tv/{id}/season/{n}} call per
+ * season. Pins the series-level mapping (AC-3), the batched episode mapping and numbering (AC-2),
+ * the 20-season batch boundary, season {@code 0} handling (AC-9), the null rules for
+ * {@code firstAirYear} / {@code posterUrl} / episode {@code title}, and the failure split: a
  * {@code 404} on the series call becomes {@link TmdbSeriesNotFoundException} (AC-8), while every
- * other upstream failure on either call stays {@link TmdbUnavailableException}.
+ * other upstream failure on either the series call or a batch call stays
+ * {@link TmdbUnavailableException}.
  */
 class RestClientTmdbGatewaySeriesTest {
 
@@ -61,8 +66,16 @@ class RestClientTmdbGatewaySeriesTest {
                 .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
     }
 
-    private void expectSeason(long tmdbId, int seasonNumber, String body) {
-        server.expect(requestTo(containsString("/tv/" + tmdbId + "/season/" + seasonNumber)))
+    private String appendToResponseParam(List<Integer> seasonNumbers) {
+        return seasonNumbers.stream()
+                .map(n -> "season/" + n)
+                .collect(Collectors.joining(","));
+    }
+
+    private void expectSeasonBatch(long tmdbId, List<Integer> seasonNumbers, String body) {
+        server.expect(requestTo(allOf(
+                        containsString("/tv/" + tmdbId),
+                        containsString("append_to_response=" + appendToResponseParam(seasonNumbers)))))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
     }
@@ -86,6 +99,7 @@ class RestClientTmdbGatewaySeriesTest {
         assertThat(series.firstAirYear()).isEqualTo(2011);
         assertThat(series.posterUrl()).isEqualTo("https://image.tmdb.org/t/p/w500/got.jpg");
         assertThat(series.seasons()).isEmpty();
+        server.verify();
     }
 
     @Test
@@ -102,11 +116,13 @@ class RestClientTmdbGatewaySeriesTest {
                   ]
                 }
                 """);
-        expectSeason(1399L, 1, """
-                {"episodes": [{"episode_number": 1, "name": "Winter Is Coming"}]}
-                """);
-        expectSeason(1399L, 2, """
-                {"episodes": [{"episode_number": 1, "name": "The North Remembers"}]}
+        expectSeasonBatch(1399L, List.of(1, 2), """
+                {
+                  "id": 1399,
+                  "name": "Game of Thrones",
+                  "season/1": {"episodes": [{"episode_number": 1, "name": "Winter Is Coming"}]},
+                  "season/2": {"episodes": [{"episode_number": 1, "name": "The North Remembers"}]}
+                }
                 """);
 
         TmdbSeries series = gateway.series(1399L);
@@ -130,12 +146,14 @@ class RestClientTmdbGatewaySeriesTest {
                   "seasons": [{"season_number": 1}]
                 }
                 """);
-        expectSeason(1399L, 1, """
+        expectSeasonBatch(1399L, List.of(1), """
                 {
-                  "episodes": [
-                    {"episode_number": 1, "name": "Winter Is Coming"},
-                    {"episode_number": 2, "name": "The Kingsroad"}
-                  ]
+                  "season/1": {
+                    "episodes": [
+                      {"episode_number": 1, "name": "Winter Is Coming"},
+                      {"episode_number": 2, "name": "The Kingsroad"}
+                    ]
+                  }
                 }
                 """);
 
@@ -145,6 +163,7 @@ class RestClientTmdbGatewaySeriesTest {
         assertThat(series.seasons().get(0).episodes().get(0).title()).isEqualTo("Winter Is Coming");
         assertThat(series.seasons().get(0).episodes().get(1).episodeNumber()).isEqualTo(2);
         assertThat(series.seasons().get(0).episodes().get(1).title()).isEqualTo("The Kingsroad");
+        server.verify();
     }
 
     @Test
@@ -158,13 +177,14 @@ class RestClientTmdbGatewaySeriesTest {
                   "seasons": [{"season_number": 1}]
                 }
                 """);
-        expectSeason(1399L, 1, """
-                {"episodes": [{"episode_number": 1}]}
+        expectSeasonBatch(1399L, List.of(1), """
+                {"season/1": {"episodes": [{"episode_number": 1}]}}
                 """);
 
         TmdbSeries series = gateway.series(1399L);
 
         assertThat(series.seasons().get(0).episodes().get(0).title()).isNull();
+        server.verify();
     }
 
     @Test
@@ -181,11 +201,11 @@ class RestClientTmdbGatewaySeriesTest {
                   ]
                 }
                 """);
-        expectSeason(1399L, 0, """
-                {"episodes": [{"episode_number": 1, "name": "Series Recap"}]}
-                """);
-        expectSeason(1399L, 1, """
-                {"episodes": [{"episode_number": 1, "name": "Winter Is Coming"}]}
+        expectSeasonBatch(1399L, List.of(0, 1), """
+                {
+                  "season/0": {"episodes": [{"episode_number": 1, "name": "Series Recap"}]},
+                  "season/1": {"episodes": [{"episode_number": 1, "name": "Winter Is Coming"}]}
+                }
                 """);
 
         TmdbSeries series = gateway.series(1399L);
@@ -194,6 +214,45 @@ class RestClientTmdbGatewaySeriesTest {
         assertThat(series.seasons().get(0).seasonNumber()).isEqualTo(0);
         assertThat(series.seasons().get(0).episodes().get(0).title()).isEqualTo("Series Recap");
         assertThat(series.seasons().get(1).seasonNumber()).isEqualTo(1);
+        server.verify();
+    }
+
+    @Test
+    void should_batchSeasonFetchesInGroupsOfAtMost20_when_seriesHasMoreThan20Seasons() {
+        String seasonsSummary = IntStream.rangeClosed(1, 25)
+                .mapToObj(n -> "{\"season_number\": " + n + "}")
+                .collect(Collectors.joining(","));
+        expectSeries(1399L, """
+                {
+                  "id": 1399,
+                  "name": "Long Runner",
+                  "first_air_date": "1990-01-01",
+                  "poster_path": "/lr.jpg",
+                  "seasons": [%s]
+                }
+                """.formatted(seasonsSummary));
+
+        String firstBatchSeasons = IntStream.rangeClosed(1, 20)
+                .mapToObj(n -> "\"season/" + n + "\": {\"episodes\": [{\"episode_number\": 1, \"name\": \"S" + n + "E1\"}]}")
+                .collect(Collectors.joining(","));
+        expectSeasonBatch(1399L, IntStream.rangeClosed(1, 20).boxed().toList(),
+                "{" + firstBatchSeasons + "}");
+
+        String secondBatchSeasons = IntStream.rangeClosed(21, 25)
+                .mapToObj(n -> "\"season/" + n + "\": {\"episodes\": [{\"episode_number\": 1, \"name\": \"S" + n + "E1\"}]}")
+                .collect(Collectors.joining(","));
+        expectSeasonBatch(1399L, IntStream.rangeClosed(21, 25).boxed().toList(),
+                "{" + secondBatchSeasons + "}");
+
+        TmdbSeries series = gateway.series(1399L);
+
+        assertThat(series.seasons()).hasSize(25);
+        assertThat(series.seasons().get(0).seasonNumber()).isEqualTo(1);
+        assertThat(series.seasons().get(19).seasonNumber()).isEqualTo(20);
+        assertThat(series.seasons().get(20).seasonNumber()).isEqualTo(21);
+        assertThat(series.seasons().get(24).seasonNumber()).isEqualTo(25);
+        assertThat(series.seasons().get(24).episodes().get(0).title()).isEqualTo("S25E1");
+        server.verify();
     }
 
     @Test
@@ -203,6 +262,7 @@ class RestClientTmdbGatewaySeriesTest {
                 """);
 
         assertThat(gateway.series(603L).posterUrl()).isNull();
+        server.verify();
     }
 
     @Test
@@ -212,6 +272,7 @@ class RestClientTmdbGatewaySeriesTest {
                 """);
 
         assertThat(gateway.series(1L).firstAirYear()).isNull();
+        server.verify();
     }
 
     @Test
@@ -244,7 +305,7 @@ class RestClientTmdbGatewaySeriesTest {
     }
 
     @Test
-    void should_throwTmdbUnavailableException_when_aSeasonCallFails() {
+    void should_throwTmdbUnavailableException_when_theSeasonBatchCallFails() {
         expectSeries(1399L, """
                 {
                   "id": 1399,
@@ -254,7 +315,9 @@ class RestClientTmdbGatewaySeriesTest {
                   "seasons": [{"season_number": 1}]
                 }
                 """);
-        server.expect(requestTo(containsString("/tv/1399/season/1")))
+        server.expect(requestTo(allOf(
+                        containsString("/tv/1399"),
+                        containsString("append_to_response=season/1"))))
                 .andRespond(withServerError());
 
         assertThatThrownBy(() -> gateway.series(1399L))
@@ -262,7 +325,7 @@ class RestClientTmdbGatewaySeriesTest {
     }
 
     @Test
-    void should_throwTmdbUnavailableException_when_aSeasonCallReturns404() {
+    void should_throwTmdbUnavailableException_when_theSeasonBatchCallReturns404() {
         expectSeries(1399L, """
                 {
                   "id": 1399,
@@ -272,7 +335,9 @@ class RestClientTmdbGatewaySeriesTest {
                   "seasons": [{"season_number": 1}]
                 }
                 """);
-        server.expect(requestTo(containsString("/tv/1399/season/1")))
+        server.expect(requestTo(allOf(
+                        containsString("/tv/1399"),
+                        containsString("append_to_response=season/1"))))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND)
                         .body("{\"status_code\":34,\"status_message\":\"not found\"}")
                         .contentType(MediaType.APPLICATION_JSON));

@@ -12,10 +12,12 @@ This story adds:
 
 - three new tables in `com.streamvault.backend.library` — `library_series` (aggregate root),
   `library_seasons`, `library_episodes` — via `V6__create_library_series_tables.sql`,
-- one new read-only method on `TmdbGateway` (`series(long)`), backed by two TMDB endpoints
-  (`GET /tv/{id}` for series-level data, then `GET /tv/{id}/season/{n}` once per season for
-  episodes), and a `TmdbSeriesNotFoundException` for the "TMDB does not recognise this id" case
-  (AC-8),
+- one new read-only method on `TmdbGateway` (`series(long)`), backed by `GET /tv/{id}` for
+  series-level data plus a batched `GET /tv/{id}?append_to_response=season/{n1},season/{n2},...`
+  fetch (up to 20 season numbers per call) for episodes, and a `TmdbSeriesNotFoundException` for the
+  "TMDB does not recognise this id" case (AC-8). Revised in round 1 of design iteration per Dev's
+  feedback — see `story-008-test-revision-r1.md`; originally one sequential
+  `GET /tv/{id}/season/{n}` call per season,
 - two additive `@ExceptionHandler` methods on `GlobalExceptionHandler`.
 
 No `SecurityConfig` change: `/api/library/**` already falls under the existing
@@ -139,9 +141,9 @@ Reuses the existing `MethodArgumentNotValidException` envelope, identical shape 
 
 TMDB's `GET /tv/{id}` returns 404 for that id (unknown id, or an id that is a movie rather than a
 series). The gateway raises `TmdbSeriesNotFoundException`, mapped to 404. Nothing is written. A
-failure on a *later* per-season call (`GET /tv/{id}/season/{n}`) is **not** this case — the series
-id was already confirmed to exist, so any failure fetching a season's episodes is treated as a TMDB
-outage (502 below), not "series not found".
+failure on a *later* batched season-episode call (`GET /tv/{id}?append_to_response=season/...`) is
+**not** this case — the series id was already confirmed to exist, so any failure fetching episode
+detail is treated as a TMDB outage (502 below), not "series not found".
 
 ```json
 { "error": "We could not find that series on TMDB." }
@@ -176,8 +178,9 @@ unchanged by this story (AC-1, AC-7):
 ### Response — 502 Bad Gateway (TMDB unavailable)
 
 TMDB unreachable, timed out, or returned a non-2xx that is not a 404 on the series call, or *any*
-non-2xx / transport failure on a season call. Reuses story-006's existing `TmdbUnavailableException`
--> 502 mapping unchanged; nothing is written and the rest of the API keeps serving.
+non-2xx / transport failure on a batched season-episode call. Reuses story-006's existing
+`TmdbUnavailableException` -> 502 mapping unchanged; nothing is written and the rest of the API keeps
+serving.
 
 ```json
 { "error": "The movie database is temporarily unavailable. Please try again in a moment." }
@@ -319,28 +322,43 @@ interface TmdbGateway {
     TmdbSeries series(long tmdbId);                            // NEW
     // series(...) throws TmdbSeriesNotFoundException on a TMDB 404 for GET /tv/{id},
     // TmdbUnavailableException on any other RestClientException / non-2xx from that call
-    // OR from any GET /tv/{id}/season/{n} call made while assembling the season/episode tree.
+    // OR from any batched GET /tv/{id}?append_to_response=season/... call made while assembling
+    // the season/episode tree.
 }
 ```
 
 ### `com.streamvault.backend.tmdb.RestClientTmdbGateway` (extended)
-Implements `series(long)` in two stages, neither routed through the existing `TmdbResultPage`-typed
-`fetch(...)` helper (same reasoning as `movie(long)` in story-007 — this needs its own catch
-shape):
+
+**Revised in design round 1** per Dev's feedback (`story-008-dev-feedback-r1.md`) — see
+`story-008-test-revision-r1.md` for the full rationale. Originally specified as one sequential
+`GET /tv/{id}/season/{n}` call per season (N+1 calls total); this made request latency and failure
+surface scale linearly with season count, which is a real cost for TMDB series entries running
+20-30+ seasons. Revised to use TMDB's `append_to_response` parameter to batch episode fetches.
+
+Implements `series(long)` in up to `1 + ceil(seasonCount / 20)` stages, neither routed through the
+existing `TmdbResultPage`-typed `fetch(...)` helper (same reasoning as `movie(long)` in story-007 —
+this needs its own catch shape):
 
 1. `GET {base-url}/tv/{tmdbId}?api_key=...` for series-level data (`id`, `name`, `first_air_date`,
    `poster_path`, and a `seasons` array of `{season_number}` summaries). A `404` here (specifically
    `HttpClientErrorException.NotFound`) throws `TmdbSeriesNotFoundException`; any other
-   `RestClientException` throws `TmdbUnavailableException`.
-2. For each season number in the order the `seasons` array lists them (including `0`, AC-9):
-   `GET {base-url}/tv/{tmdbId}/season/{seasonNumber}?api_key=...`, mapping its `episodes` array
-   (`episode_number`, `name`) into `TmdbEpisode`s. **Any** `RestClientException` on this call
-   (including a 404, which should not happen for a season TMDB itself just listed, but is treated
-   consistently) throws `TmdbUnavailableException` — the series id is already confirmed valid, so a
-   season-fetch failure is an availability problem, not a "not found" one.
+   `RestClientException` throws `TmdbUnavailableException`. If the `seasons` array is empty, stop
+   here — no batch call is made (`TmdbSeries.seasons()` is an empty list).
+2. Partition the season numbers from the `seasons` array, in the order TMDB lists them (including
+   `0`, AC-9), into consecutive batches of at most 20. For each batch, issue
+   `GET {base-url}/tv/{tmdbId}?api_key=...&append_to_response=season/{n1},season/{n2},...` (comma
+   -separated `season/{n}` values, in batch order). TMDB embeds each requested season's full object,
+   including its `episodes` array, under a top-level `season/{n}` key on the response; the gateway
+   reads only `episodes[].episode_number` / `episodes[].name` from each and maps them to
+   `TmdbEpisode`s, in the season order established in step 1. **Any** `RestClientException` on a
+   batch call (including a 404, which should not happen for seasons TMDB itself just listed, but is
+   treated consistently) throws `TmdbUnavailableException` — the series id is already confirmed
+   valid, so a batch-fetch failure is an availability problem, not a "not found" one.
 
-`first_air_date` reuses the existing `parseYear` helper; `poster_path` reuses the existing
-`imageBaseUrl` prefixing rule. No caching between calls is required or implemented.
+For the common case of a show with 20 or fewer seasons (nearly every series), this is exactly 2 HTTP
+calls total instead of N+1. `first_air_date` reuses the existing `parseYear` helper; `poster_path`
+reuses the existing `imageBaseUrl` prefixing rule. No caching between calls is required or
+implemented.
 
 ### `com.streamvault.backend.library.LibrarySeriesService`
 ```java

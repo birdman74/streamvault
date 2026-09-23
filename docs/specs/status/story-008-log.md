@@ -10,6 +10,40 @@ PR: none yet
 
 ---
 
+## Phase 2: Design iteration round 1 (2026-09-23)
+
+Dev's round 1 feedback (`story-008-dev-feedback-r1.md`) raised one concern, otherwise agreed the
+design was sound: the gateway contract's `series(long)` sequential one-`GET /tv/{id}/season/{n}`
+-call-per-season fetch scales latency and failure surface linearly with season count, a real cost
+for TMDB series entries running 20-30+ seasons. Dev verified TMDB's `GET /tv/{series_id}` supports
+`append_to_response=season/{n1},season/{n2},...` (up to 20 items per call), embedding each season's
+full object including `episodes` in the single response.
+
+**Accepted as technically valid, full details in `story-008-test-revision-r1.md`.** Revised
+`story-008-api-contracts.md` and `story-008-test-plan.md` to describe the batched design (series
+-detail call, then one `append_to_response` batch call per group of up to 20 season numbers, in
+TMDB's listed order) in place of the N+1 sequential design. Rewrote
+`RestClientTmdbGatewaySeriesTest.java` to match: every per-season expectation became a per-batch
+expectation against the `append_to_response=season/...` query fragment, with fixture bodies updated
+to the batched TMDB response shape. Added new coverage,
+`should_batchSeasonFetchesInGroupsOfAtMost20_when_seriesHasMoreThan20Seasons` (a 25-season series
+must produce exactly two batch calls: seasons 1-20, then 21-25) — the chunking boundary is now a
+pinned behavior, not just an implementation detail. Renamed the two season-failure tests
+(`...aSeasonCallFails` / `...aSeasonCallReturns404` -> `...theSeasonBatchCallFails` /
+`...theSeasonBatchCallReturns404`) with identical assertions.
+
+No AC or invariant coverage dropped: AC-2, AC-8, AC-9 are still covered by the same behaviors,
+exercised through the new call shape. No response DTO shape, service, controller, or schema layer
+touched — contained entirely to `RestClientTmdbGateway`'s internal call shape and its gateway-level
+test, exactly as Dev scoped the concern. `mvn test-compile` re-run after the revision: still fails,
+still only on "cannot find symbol" for the not-yet-implemented production classes; the rewritten
+test file introduces no new compile errors of its own.
+
+Pushed to `feature/story-008-add-series-from-tmdb`. Awaiting Dev's response — either a round 2
+concern or `story-008-agreed.md` to trigger implementation.
+
+---
+
 ## Phase 1: Test goes first
 
 Complete on branch `feature/story-008-add-series-from-tmdb`, cut from `main` after STORY-007

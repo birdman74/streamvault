@@ -10,6 +10,25 @@ PR: none yet
 
 ---
 
+## Phase 2: Design agreed, round 2 (2026-09-23)
+
+Reviewed Test's round 1 revision (`story-008-test-revision-r1.md`) fresh, not just the single
+concern it addressed. Confirmed the batched `append_to_response` gateway contract fully resolves
+Dev's round 1 concern (N+1 sequential season calls -> 2 calls for the common <=20-season case,
+`ceil(N/20)+1` worst case) with no AC or invariant coverage dropped, no response DTO shape changed,
+and no service/controller/schema layer touched. Re-checked the rest of the design independently:
+schema-level FK/cascade/unique constraints for AC-5/AC-6/no-orphans, the exception split
+(`TmdbSeriesNotFoundException` only on the series call, `TmdbUnavailableException` on any batch-call
+failure since the series id is already confirmed), season-0/null-title handling for AC-9/AC-2, and
+the AC-7 "and see" isolation-guarantee treatment (consistent with the still-pending story-007 AC-6
+precedent). No new concerns.
+
+Agreed. Committed `story-008-agreed.md`. Next step: Dev begins Phase 2 implementation — lower-level
+unit tests first (TDD), then implementation until Test's failing tests and Dev's own unit tests all
+pass, then `mvn clean verify`, then PR.
+
+---
+
 ## Phase 2: Design iteration round 1 (2026-09-23)
 
 Dev's round 1 feedback (`story-008-dev-feedback-r1.md`) raised one concern, otherwise agreed the

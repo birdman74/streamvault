@@ -6,7 +6,54 @@
 
 Spec: `docs/specs/story-008-add-series-from-tmdb.md`
 Branch: `feature/story-008-add-series-from-tmdb`
-PR: none yet
+PR: #29
+
+---
+
+## Phase 3: Final PR verification — APPROVED (2026-09-23)
+
+**Verdict: APPROVED.** All AC-1..AC-9 and every identified cross-story invariant pass. No
+regressions found; no new regression tests required.
+
+**Suite run:** `mvn clean verify` on PR #29 head (`485016a`): **301 tests, 0 failures, 0 errors, 0
+skipped**, JaCoCo coverage gate met, `BUILD SUCCESS`. Matches Dev's PR-reported numbers exactly.
+
+**AC coverage:** every row in `story-008-test-plan.md`'s AC table maps to tests that ran and passed
+in this suite — `LibrarySeriesControllerTest` (7), `LibrarySeriesEndpointsSecurityTest` (8),
+`LibrarySeriesServiceTest` (13), `LibrarySeriesRepositoryTest` (4),
+`LibrarySeriesControllerPrincipalConventionTest` (3), `LibrarySeriesTablesConstraintsTest` (13),
+`RestClientTmdbGatewaySeriesTest` (13), `RestClientTmdbGatewayBatchPartitioningTest` (6),
+`AddSeriesRequestValidationTest` (5), `LibrarySeriesEntityWiringTest` (3). No AC or invariant left
+uncovered.
+
+**Regression analysis (diff-driven, per Phase 3 step 3):**
+- `GlobalExceptionHandler`: additive only (two new `@ExceptionHandler` methods for
+  `DuplicateLibrarySeriesException` / `TmdbSeriesNotFoundException`); every pre-existing mapping's
+  test class re-ran unchanged and green (`LibraryMovieControllerTest`, `AccountSettingsControllerTest`,
+  `AuthControllerGoogleTest`, `TmdbControllerTest`).
+- `RestClientTmdbGateway` / `TmdbGateway`: purely additive (`series(long)` + `partitionIntoBatches`);
+  `search` / `browse` / `movie(long)` untouched, confirmed by inspecting the diff (no existing method
+  body changed) and by `RestClientTmdbGatewayTest` and `RestClientTmdbGatewayMovieTest` re-running
+  unchanged and green.
+- `TmdbPackageReadOnlyConventionTest`: the only pre-existing test file modified by this story
+  (Flyway pin V1..V5 -> V1..V6). This amendment was made by Test in the Phase 1 commit, not Dev's
+  implementation commit, and was already reviewed during design iteration — confirmed still correctly
+  pinning the full migration list and still green.
+- No changes to `SecurityConfig`, JWT generation, `WatchStatus`, `User`, `pom.xml`, or any
+  configuration file. Full schema/FK/cascade/unique-constraint invariant set, principal-sourced
+  user-id convention, and ADR-001 controller-slice convention all verified via the tests listed
+  in `story-008-test-plan.md`'s Cross-Story Invariants table, all green.
+
+No shared-infrastructure surface was changed beyond what the Phase 1 test plan already anticipated
+and covered. No additional regression tests were written this phase.
+
+**Recommendation:** APPROVED. Posted as a PR comment on #29 (gh review blocked for the PR's own
+author account — see below) carrying this verdict.
+
+**Note on `gh pr review`:** `gh` in this container authenticates as the same bot account that opened
+PR #29, so `gh pr review --approve` is rejected by GitHub (`Review Can not approve your own pull
+request`). Per persona convention, the formal verdict is posted as a structured PR comment instead;
+this is not a task failure.
 
 ---
 

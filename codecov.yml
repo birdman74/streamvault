@@ -1,0 +1,6 @@
+# Codecov repository configuration.
+# Only keys listed here override Codecov's defaults.
+
+github_checks:
+  annotations: true
+

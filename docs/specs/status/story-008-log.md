@@ -10,6 +10,52 @@ PR: none yet
 
 ---
 
+## Phase 2: Implementation complete (2026-09-23)
+
+Implemented against `story-008-agreed.md` / the round-1-revised `story-008-api-contracts.md`. All of
+Test's failing tests plus Dev's own lower-level unit tests pass; `mvn clean verify` is green
+(301 tests, 0 failures/errors, JaCoCo coverage gate met).
+
+**New production code:**
+- `V6__create_library_series_tables.sql` — `library_series` / `library_seasons` / `library_episodes`,
+  exactly as specified (two FK/cascade chains, three unique constraints).
+- `com.streamvault.backend.library`: `LibrarySeries` (aggregate root, `addSeason`), `LibrarySeason`
+  (`addEpisode`), `LibraryEpisode` — bidirectional wiring done via package-private `setLibrarySeries`
+  / `setLibrarySeason` methods (private fields can't be set cross-class even within a package, so a
+  package-private accessor is the mechanism behind the contract's `season.librarySeries = this`
+  shorthand). Both `@OneToMany` sides use `@OrderBy("id ASC")`, not `@OrderColumn` — the schema has no
+  dedicated order column, and `@OrderColumn` would have required one; `@OrderBy` generates an
+  `ORDER BY` over the existing `id` column instead, which is enough to preserve TMDB's season/episode
+  order on reload since rows are inserted in that order.
+- `LibrarySeriesRepository`, the four `dto` records, `DuplicateLibrarySeriesException`,
+  `LibrarySeriesService` (duplicate-check-before-TMDB, forces `PLANNED` on every episode regardless
+  of TMDB input, unique-constraint race backstop), `LibrarySeriesController`.
+- `TmdbSeries` / `TmdbSeason` / `TmdbEpisode` records, `TmdbSeriesNotFoundException`.
+- `TmdbGateway.series(long)` + `RestClientTmdbGateway` implementation: one `GET /tv/{id}` call for
+  series-level data, then `partitionIntoBatches` (season-number chunking at 20, made package-private
+  static specifically so it's unit-testable as a pure function per the agreed design) driving one
+  `GET /tv/{id}?append_to_response=season/{n1},...` call per batch. The batched response's dynamic
+  `season/{n}` keys are read via Jackson `JsonNode` rather than a fixed record shape, since the key
+  set varies per batch and per series.
+- Two additive `GlobalExceptionHandler` mappings (`DuplicateLibrarySeriesException` -> 409,
+  `TmdbSeriesNotFoundException` -> 404).
+
+**Dev-authored unit tests (TDD, written before the corresponding production code, both failing
+first):**
+- `RestClientTmdbGatewayBatchPartitioningTest` — `partitionIntoBatches` in isolation, no
+  `MockRestServiceServer`, covering the boundary counts the agreed design called out: 0, 1, 20, 21,
+  40, 41 seasons.
+- `LibrarySeriesEntityWiringTest` — `addSeason` / `addEpisode` both-sides-set invariant, directly
+  rather than only incidentally through `LibrarySeriesRepositoryTest`'s round-trip.
+
+No deviation from the agreed design's implementation plan. `TmdbPackageReadOnlyConventionTest`'s V6
+pin (already amended by Test in the Phase 1 commit) passes now that `V6__create_library_series_tables.sql`
+exists.
+
+Committing implementation and opening the PR against `main` as `claude-streamvault-dev`.
+
+---
+
 ## Phase 2: Design agreed, round 2 (2026-09-23)
 
 Reviewed Test's round 1 revision (`story-008-test-revision-r1.md`) fresh, not just the single

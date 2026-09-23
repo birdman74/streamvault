@@ -1,3 +1,4 @@
+# Guard pattern: see docs/adr/ADR-002-push-trigger-guard-pattern.md
 name: Trigger Test — Dev Feedback Requires Revision
 
 on:
@@ -31,14 +32,16 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Identify story and round
+      - name: Identify commit author and context
         id: context
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             STORY_ID="${{ github.event.inputs.story_id }}"
             BRANCH="${{ github.event.inputs.feature_branch }}"
             ROUND="${{ github.event.inputs.revision_round }}"
+            COMMIT_AUTHOR="claude-streamvault-dev"
           else
+            COMMIT_AUTHOR=$(git log -1 --format='%an')
             BRANCH="${{ github.ref_name }}"
             STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
             # Determine round from existing feedback files on disk
@@ -49,12 +52,39 @@ jobs:
               fi
             done
           fi
+          echo "commit_author=$COMMIT_AUTHOR" >> $GITHUB_OUTPUT
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "round=$ROUND" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-          echo "Story: $STORY_ID, Revision round: $ROUND, Branch: $BRANCH"
+          echo "Commit author: $COMMIT_AUTHOR, Story: $STORY_ID, Revision round: $ROUND, Branch: $BRANCH"
+
+      - name: Check commit author is Dev persona
+        id: author_check
+        run: |
+          if [ "${{ steps.context.outputs.commit_author }}" == "claude-streamvault-dev" ]; then
+            echo "is_dev=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_dev=false" >> $GITHUB_OUTPUT
+            echo "Commit author is not claude-streamvault-dev — skipping."
+          fi
+
+      - name: Check revision not already handled
+        id: state_check
+        if: steps.author_check.outputs.is_dev == 'true' && github.event_name != 'workflow_dispatch'
+        run: |
+          STORY_ID="${{ steps.context.outputs.story_id }}"
+          ROUND="${{ steps.context.outputs.round }}"
+          if [ -f "docs/specs/design/${STORY_ID}-test-revision-r${ROUND}.md" ]; then
+            echo "needs_revision=false" >> $GITHUB_OUTPUT
+            echo "Revision r${ROUND} already committed — skipping."
+          else
+            echo "needs_revision=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Launch Test persona for revision
+        if: |
+          steps.author_check.outputs.is_dev == 'true' &&
+          (github.event_name == 'workflow_dispatch' || steps.state_check.outputs.needs_revision == 'true')
         env:
           STORY_ID: ${{ steps.context.outputs.story_id }}
           REVISION_ROUND: ${{ steps.context.outputs.round }}

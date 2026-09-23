@@ -118,6 +118,7 @@ docs/adr/
 
 Existing ADRs:
 - [ADR-001](docs/adr/ADR-001-spring-mvc-test-auth-pattern.md) -- Spring MVC controller test authentication pattern
+- [ADR-002](docs/adr/ADR-002-push-trigger-guard-pattern.md) -- Push-triggered workflow guard pattern (commit-author and state checks required before launching a persona container)
 
 If your decision is not covered by an existing ADR, flag it to Brian. New ADRs are created when a decision has significant long-term consequences and alternatives were considered.
 

@@ -1,3 +1,4 @@
+# Guard pattern: see docs/adr/ADR-002-push-trigger-guard-pattern.md
 name: Trigger Dev — Agreed Design, Begin Implementation
 
 on:
@@ -27,21 +28,53 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Identify story
+      - name: Identify commit author and context
         id: context
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             STORY_ID="${{ github.event.inputs.story_id }}"
             BRANCH="${{ github.event.inputs.feature_branch }}"
+            COMMIT_AUTHOR="claude-streamvault-dev"
           else
+            COMMIT_AUTHOR=$(git log -1 --format='%an')
             BRANCH="${{ github.ref_name }}"
             STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
           fi
+          echo "commit_author=$COMMIT_AUTHOR" >> $GITHUB_OUTPUT
           echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-          echo "Agreement reached for $STORY_ID on $BRANCH"
+          echo "Commit author: $COMMIT_AUTHOR, Story: $STORY_ID, Branch: $BRANCH"
+
+      - name: Check commit author is Dev persona
+        id: author_check
+        run: |
+          if [ "${{ steps.context.outputs.commit_author }}" == "claude-streamvault-dev" ]; then
+            echo "is_dev=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_dev=false" >> $GITHUB_OUTPUT
+            echo "Commit author is not claude-streamvault-dev — skipping."
+          fi
+
+      - name: Check implementation not already in progress
+        id: state_check
+        if: steps.author_check.outputs.is_dev == 'true' && github.event_name != 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+        run: |
+          PR_DATA=$(gh pr list --head "$BRANCH" --state open --json number 2>/dev/null)
+          PR_NUMBER=$(echo "$PR_DATA" | jq -r '.[0].number // empty')
+          if [ -n "$PR_NUMBER" ]; then
+            echo "needs_implementation=false" >> $GITHUB_OUTPUT
+            echo "PR #$PR_NUMBER already open for this branch — implementation already done, skipping."
+          else
+            echo "needs_implementation=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Launch Dev persona for implementation
+        if: |
+          steps.author_check.outputs.is_dev == 'true' &&
+          (github.event_name == 'workflow_dispatch' || steps.state_check.outputs.needs_implementation == 'true')
         env:
           STORY_ID: ${{ steps.context.outputs.story_id }}
           FEATURE_BRANCH: ${{ steps.context.outputs.branch }}

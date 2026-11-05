@@ -23,7 +23,7 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-09-23
+2026-11-05
 
 ### Current Phase
 Application Development - User Authentication epic complete and merged (STORY-001, STORY-002).
@@ -104,7 +104,7 @@ Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the q
 - [x] STORY-005: Account Settings for Rating Type Preference (`docs/specs/story-005-account-settings-rating-type.md`) - Completed - Full trace: `docs/specs/status/story-005-log.md`
 - [x] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Completed - Full trace: `docs/specs/status/story-006-log.md`
 - [x] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Full trace: `docs/specs/status/story-007-log.md`
-- [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006 - Test APPROVED on PR #29, awaiting merge - Full trace: `docs/specs/status/story-008-log.md`
+- [ ] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006 - Test APPROVED on PR #29; Dev fixed Codecov patch coverage gap, awaiting merge - Full trace: `docs/specs/status/story-008-log.md`
 - [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008
 - [ ] STORY-010: Set Movie Watch Status (`docs/specs/story-010-set-movie-watch-status.md`) - prereq STORY-007
 - [ ] STORY-011: Remove Item from Library (`docs/specs/story-011-remove-library-item.md`) - prereq STORY-007, STORY-008

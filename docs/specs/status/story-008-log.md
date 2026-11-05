@@ -10,6 +10,39 @@ PR: #29
 
 ---
 
+## Dev: Codecov patch coverage fix on PR #29 (2026-11-05)
+
+Codecov flagged a patch coverage drop on PR #29 with `codecov/patch` annotations on new lines.
+Ran `mvn clean verify` on the branch and cross-referenced `target/site/jacoco/jacoco.xml` against
+`git diff main...HEAD` for every file this PR touches, to separate genuinely new/changed lines
+from pre-existing lines in touched files (only the former affects patch coverage).
+
+**Gaps found in new story-008 code, now closed:**
+- `LibraryEpisode#getId()` / `LibrarySeason#getId()` — never asserted after a cascading save; added
+  `LibrarySeriesCascadeIdentityTest` to pin that `@GeneratedValue(IDENTITY)` round-trips for the two
+  cascaded child tables, not just the parent `library_series` row.
+- `TmdbSeriesNotFoundException` had no unit test at all (unlike its sibling
+  `TmdbTitleNotFoundException` from story-007) — added `TmdbSeriesNotFoundExceptionTest` mirroring
+  that pattern.
+- `RestClientTmdbGateway#series(long)` and `#toSeason`: five branches the Test-authored
+  `RestClientTmdbGatewaySeriesTest` didn't reach — a `204 No Content` series response, a series
+  payload omitting `seasons` entirely (vs. an empty array), a `204 No Content` season-batch
+  response, a season batch entry omitting `episodes`, and an episode `name` sent as explicit JSON
+  `null` (vs. the key being absent). Added `RestClientTmdbGatewaySeriesEdgeCasesTest` (5 tests,
+  Dev-authored edge cases below Test's integration boundary, same convention as story-007's
+  `RestClientTmdbGatewayMovieEdgeCasesTest`).
+
+**Left alone (pre-existing, not part of this PR's diff, so irrelevant to patch coverage):**
+`RestClientTmdbGateway#toResultPage`'s `EMPTY_PAGE` null-response branch and `#toResult`'s
+`media_type` literal-null ternary branch (both from story-006), and three pre-existing
+`GlobalExceptionHandler` handlers (`EmailAlreadyRegistered`, `InvalidCredentials`, generic
+`Exception`) unrelated to story-008. No production code changed.
+
+**Suite run:** `mvn clean verify` after the new tests: **309 tests, 0 failures, 0 errors, 0
+skipped**, `BUILD SUCCESS` (up from 301; +8 new tests, 0 removed).
+
+---
+
 ## Phase 3: Final PR verification — APPROVED (2026-09-23)
 
 **Verdict: APPROVED.** All AC-1..AC-9 and every identified cross-story invariant pass. No

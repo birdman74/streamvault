@@ -32,7 +32,9 @@ a derived value from STORY-012's not-yet-implemented roll-up rule.
 | `LibraryMovie` / `LibrarySeries` / `LibrarySeason` / `LibraryEpisode` entities (STORY-007, STORY-008) are read-only from this story's perspective - no setter is added, no field changes | No test needed; `LibraryServiceTest` constructs fixtures using only each entity's existing public constructor and `addSeason` / `addEpisode` helpers, identical to `LibrarySeriesServiceTest`'s existing fixture style. |
 | JWT generation is untouched | This story changes no auth/JWT code. `JwtServiceTest` and `SecurityConfigAuthFlowTest` re-run unchanged in the Phase 3 suite. |
 | No Flyway migration is added | `TmdbPackageReadOnlyConventionTest.should_notAddAnyNewFlywayMigration_when_theStoryIsImplemented` re-runs **unchanged** (still pinned at V1..V6) - this story adds no table, so unlike story-007/008 this guard needs no amendment. |
-| A `LibrarySeries` loaded by a repository query - not one just built in Java memory in the same call, as every existing read in this codebase does today - must have `seasons` / `seasons.episodes` already initialized, since `spring.jpa.open-in-view: false` means the Hibernate session closes the moment the repository call returns (added in response to Dev's round 1 feedback, Concerns 1/2; design decision 8) | `LibrarySeriesRepositoryEagerFetchTest.should_haveSeasonsAndEpisodesAlreadyInitialized_when_accessedAfterFindByUserIdReturns` |
+| `LibrarySeriesRepository.findByUserId` alone (single bag, `seasons` only) must have `seasons` already initialized with no open session, since `spring.jpa.open-in-view: false` closes the Hibernate session the moment the repository call returns (added in response to Dev's round 1 feedback, Concerns 1/2; revised round 2 to a single-bag entity graph after Dev's Concern 1, `story-009-dev-feedback-r2.md`, design decision 8) | `LibrarySeriesRepositoryEagerFetchTest.should_haveSeasonsAlreadyInitialized_when_accessedAfterFindByUserIdReturns` |
+| `LibrarySeasonRepository.findSeasonsWithEpisodesByLibrarySeriesIdIn` alone must have `episodes` already initialized on every returned `LibrarySeason`, with no open session (new repository, added round 2 to replace the two-level entity graph that round 1 proposed; design decision 8) | `LibrarySeasonRepositoryEagerFetchTest.should_haveEpisodesAlreadyInitialized_when_accessedAfterFindSeasonsWithEpisodesReturns` |
+| `LibraryService.list(...)`'s `@Transactional(readOnly = true)` boundary must make the `findByUserId` call and the `findSeasonsWithEpisodesByLibrarySeriesIdIn` call share one Hibernate session, so the episodes fetched by the second call attach onto the exact `LibrarySeason` objects already hanging off the first call's `LibrarySeries.getSeasons()` by entity identity - this is the property the two-query split (round 2) depends on that a repository-level test calling each query independently cannot prove, since each would otherwise open its own transaction and the instances would diverge | `LibraryServiceEagerFetchIntegrationTest.should_rollUpASeriesStatusCorrectly_when_listIsCalledOnARealSpringContextAfterSeedingMultipleSeasons` |
 
 ## API Contracts
 
@@ -96,18 +98,54 @@ endpoint with no write path and no TMDB call:
     belonging to the queried user, and that another user's rows are excluded (AC-7). No existing
     method in either file is changed.
 
-- **New: `library/LibrarySeriesRepositoryEagerFetchTest`** - a dedicated `@SpringBootTest` + H2
-  file, added in response to Dev's round 1 feedback (Concerns 1/2), not amended into
+- **`library/LibrarySeriesRepositoryEagerFetchTest`** - a dedicated `@SpringBootTest` + H2 file,
+  added in response to Dev's round 1 feedback (Concerns 1/2), not amended into
   `LibrarySeriesRepositoryTest`. Deliberately carries no class- or method-level `@Transactional`:
   that would keep the Hibernate session open for the whole test and silently hide the exact bug this
   test exists to catch. Each repository call (`save`, then `findByUserId`) therefore runs in its own
   self-contained transaction exactly as it would on the real `GET /api/library` request path under
   `spring.jpa.open-in-view: false`, and the single test method cleans up for itself in an `@AfterEach`
-  rather than relying on test-transaction rollback. Saves a series with two seasons (one with an
-  episode, one with two), calls `findByUserId`, and asserts `getSeasons()` /
-  `getSeasons().get(1).getEpisodes()` are both already populated with no open session - this fails
-  with an uncaught `LazyInitializationException` if `findByUserId`'s `@EntityGraph` (design decision
-  8) is ever dropped or narrowed.
+  rather than relying on test-transaction rollback. **Revised round 2** (Dev's Concern 1,
+  `story-009-dev-feedback-r2.md`): the single-call guarantee this test can actually make shrank to
+  match the corrected single-bag `@EntityGraph(attributePaths = {"seasons"})` - it now saves a series
+  with two seasons, calls `findByUserId`, and asserts only `getSeasons()` is already populated with
+  no open session (`should_haveSeasonsAlreadyInitialized_when_accessedAfterFindByUserIdReturns`,
+  renamed from the round 1 method name). It intentionally does not assert anything about
+  `episodes` - under the round 2 design, that is populated by a second, separate repository call,
+  proved by the next two test classes.
+
+- **New: `library/LibrarySeasonRepositoryEagerFetchTest`** (round 2) - same no-`@Transactional`,
+  self-contained-transaction, `@AfterEach`-cleanup discipline as
+  `LibrarySeriesRepositoryEagerFetchTest`, proving the second half of the round 2 fetch split in
+  isolation: saves a `LibrarySeries` with one season holding two episodes directly via
+  `librarySeriesRepository` (cascaded in one `save`), then calls
+  `librarySeasonRepository.findSeasonsWithEpisodesByLibrarySeriesIdIn(List.of(seasonsSeriesId))`
+  as an independent top-level call and asserts the returned `LibrarySeason`'s `getEpisodes()` is
+  already populated with no open session
+  (`should_haveEpisodesAlreadyInitialized_when_accessedAfterFindSeasonsWithEpisodesReturns`) - fails
+  with an uncaught `LazyInitializationException` if the `LEFT JOIN FETCH s.episodes` in
+  `LibrarySeasonRepository`'s `@Query` (design decision 8) is ever dropped or narrowed.
+
+- **New: `library/LibraryServiceEagerFetchIntegrationTest`** (round 2) - the test that closes the
+  gap the two repository-level eager-fetch tests above cannot: proving that
+  `findByUserId` and `findSeasonsWithEpisodesByLibrarySeriesIdIn`, called from inside the *same*
+  `LibraryService.list(...)` invocation, actually share one Hibernate session so the episodes
+  fetched by the second query attach onto the exact `LibrarySeason` instances the first query already
+  loaded (design decision 8's round 2 rationale: Spring's default `REQUIRED` transaction propagation
+  makes this true only when both calls happen inside one `@Transactional` method, not when each is
+  called standalone - which is exactly how the two repository-level eager-fetch tests above call
+  them, deliberately, to isolate each query's own fetch behavior). A `@SpringBootTest` + H2 file with
+  the real `LibraryService` autowired (not Mockito-mocked, unlike `LibraryServiceTest` - a mocked
+  repository cannot exercise real Hibernate session-sharing), no class- or method-level
+  `@Transactional` for the same reason as the other eager-fetch tests, `@AfterEach` cleanup. Seeds a
+  series with two seasons across a mix of `WATCHED` and `PLANNED` episode statuses (chosen so a
+  correct roll-up must be `CURRENTLY_WATCHING`, which only happens if every episode across every
+  season was actually visible to `WatchStatusRollup.seriesStatus(...)` - a silently-empty or
+  partially-initialized collection would roll up to the wrong status instead of throwing, which is
+  why this test asserts on the specific resulting status rather than only on "no exception"), calls
+  `libraryService.list(userId, null, null, null, null)` fresh, and asserts the single returned item's
+  `status` is `"CURRENTLY_WATCHING"` with no exception thrown
+  (`should_rollUpASeriesStatusCorrectly_when_listIsCalledOnARealSpringContextAfterSeedingMultipleSeasons`).
 
 - **Security / end-to-end integration test (`library/LibraryListEndpointsSecurityTest`)** -
   `@SpringBootTest(webEnvironment = MOCK)` + `@AutoConfigureMockMvc` (real filter chain), H2, real
@@ -125,12 +163,15 @@ endpoint with no write path and no TMDB call:
 ### RED state expectation
 
 `LibraryItemType`, `WatchStatusRollup`, `LibraryService`, `LibraryController`,
-`LibraryListRequest`, `LibraryItemResponse`, `LibraryListResponse`, and the two new repository
-finder methods do not exist yet. The test module fails at `test-compile`, consistent with
+`LibraryListRequest`, `LibraryItemResponse`, `LibraryListResponse`, `LibrarySeasonRepository` (new,
+round 2), and the two repository finder methods on `LibraryMovieRepository` /
+`LibrarySeriesRepository` do not exist yet. The test module fails at `test-compile`, consistent with
 story-002/005/006/007/008's expected Phase 1 RED. The two amended repository test files
 (`LibraryMovieRepositoryTest`, `LibrarySeriesRepositoryTest`) also fail to compile, since their new
-methods call the not-yet-existing `findByUserId`, and the new
-`LibrarySeriesRepositoryEagerFetchTest` fails to compile for the same reason.
+methods call the not-yet-existing `findByUserId`, and `LibrarySeriesRepositoryEagerFetchTest`,
+`LibrarySeasonRepositoryEagerFetchTest` (new, round 2), and `LibraryServiceEagerFetchIntegrationTest`
+(new, round 2) fail to compile for the same reason plus the not-yet-existing
+`LibrarySeasonRepository` / `LibraryService`.
 
 ## Out of Scope
 

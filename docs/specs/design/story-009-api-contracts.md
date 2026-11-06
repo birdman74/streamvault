@@ -79,25 +79,47 @@ here for Dev and Brian's visibility, same discipline as story-007/008.
    `(type, id)`, not `id` alone. Documented here so STORY-010 / STORY-011 / STORY-012 do not assume
    global uniqueness of the bare `id` this endpoint returns.
 8. **`LibrarySeriesRepository.findByUserId` carries an explicit `@EntityGraph(attributePaths =
-   {"seasons", "seasons.episodes"})`, and `LibraryService.list(...)` is `@Transactional(readOnly =
-   true)`.** Accepted from Dev's round 1 feedback (`story-009-dev-feedback-r1.md`, Concerns 1 and 2)
-   rather than left implicit. This project's `application.yml` sets `spring.jpa.open-in-view: false`,
-   and `LibrarySeries.seasons` / `LibrarySeason.episodes` are both default-`LAZY`
-   `@OneToMany`. STORY-009 is the first place in this codebase that loads a `LibrarySeries` via a
-   repository query and then walks into `seasons` / `seasons.episodes` afterward - every existing
-   read of those collections (`LibrarySeriesService`, mapping to `LibrarySeriesResponse`) walks an
-   entity graph just built in Java memory within the same call, never one freshly loaded from the
-   database. Without an explicit fetch strategy, the Hibernate session closes the moment
-   `findByUserId` returns, and `WatchStatusRollup.seriesStatus(...)` would hit uninitialized proxies
-   with no session - a `LazyInitializationException` on every request that includes a series, which
-   is the normal case for AC-1, AC-2, and AC-4, not an edge case. The single `@EntityGraph` fetches
-   `seasons` and `seasons.episodes` in one query per call, which also resolves Dev's second concern
-   (an unguarded N+1 - one seasons query plus one episodes-per-season query, on every single
-   `GET /api/library` call, since design decision 3 requires every series' rollup computed for both
-   display and status-filtering on every request, not just the returned page) without a second round
-   trip. `@Transactional(readOnly = true)` on the service method is the explicit transactional
-   boundary Dev asked the contract to state rather than leave to Spring Data's per-repository-call
-   default.
+   {"seasons"})`; a new `LibrarySeasonRepository.findSeasonsWithEpisodesByLibrarySeriesIdIn(List<Long>
+   seriesIds)` eager-fetches every episode for a batch of series in one query; and
+   `LibraryService.list(...)` is `@Transactional(readOnly = true)` so both queries run inside the same
+   Hibernate session.** Originally accepted from Dev's round 1 feedback
+   (`story-009-dev-feedback-r1.md`, Concerns 1 and 2) as a single two-level `@EntityGraph`; revised
+   again in round 2 (`story-009-dev-feedback-r2.md`, Concern 1) after Dev checked the entity source
+   directly: `LibrarySeries.seasons` and `LibrarySeason.episodes` are both `List`-typed `@OneToMany`
+   collections with `@OrderBy` and no `@OrderColumn` - Hibernate bags, not `Set`s or indexed lists.
+   Requesting two nested `*ToMany` bag paths (`seasons` and `seasons.episodes`) in a single entity
+   graph is the textbook `org.hibernate.loader.MultipleBagFetchException: cannot simultaneously fetch
+   multiple bags` trigger, thrown at query execution time against any series with at least one
+   season - the normal case for AC-1, AC-2, and AC-4, not an edge case, and the exact case Test's own
+   `LibrarySeriesRepositoryEagerFetchTest` was written to exercise.
+
+   This project's `application.yml` sets `spring.jpa.open-in-view: false`, so the underlying problem
+   from round 1 - the Hibernate session closing the moment a repository call returns, leaving
+   `WatchStatusRollup.seriesStatus(...)` to hit uninitialized proxies with no session - is unchanged
+   and still requires an explicit fetch strategy. The round 2 fix keeps the two concerns (bag conflict,
+   N+1) resolved without touching either entity class (both stay genuinely read-only, per this
+   story's own cross-story invariant), by splitting the single entity graph into two queries that
+   share one session:
+   1. `@EntityGraph(attributePaths = {"seasons"})` on `findByUserId` - a single bag path, safe on its
+      own, run once per `list(...)` call.
+   2. A second query, also run once per `list(...)` call (not once per series) - `LibrarySeasonRepository`
+      is a new repository, `@Query("SELECT DISTINCT s FROM LibrarySeason s LEFT JOIN FETCH s.episodes
+      WHERE s.librarySeries.id IN :seriesIds")`, called only when step 1 returned at least one series.
+      Hibernate attaches the fetched `episodes` collections onto the already-managed `LibrarySeason`
+      entities from step 1 by entity identity, because both queries run inside `LibraryService.list(...)`'s
+      one `@Transactional(readOnly = true)` boundary: Spring's default `REQUIRED` propagation means
+      each repository call joins that already-open transaction/session rather than opening its own,
+      which is also why this fix only works if both calls happen from inside one `@Transactional`
+      service method, not from two independent top-level calls. `WatchStatusRollup.seriesStatus(...)`
+      then sees both collections already initialized with no further round trips.
+
+   Still 2 queries total for the series branch per `GET /api/library` call regardless of how many
+   series the user has - same asymptotic win as the original proposal, without the bag conflict.
+   `@Transactional(readOnly = true)` on the service method is unchanged from round 1 and is now also
+   the mechanism the two-query split depends on for session sharing, not just the explicit
+   transactional boundary Dev originally asked the contract to state. This is the first `@Query` in
+   this codebase; `seriesIds` is bound with an explicit `@Param("seriesIds")` rather than relying on
+   `-parameters` compiler metadata, since there is no existing precedent either way in this project.
 
 ## Spec clarification already surfaced to Brian
 
@@ -298,16 +320,39 @@ public interface LibrarySeriesRepository extends JpaRepository<LibrarySeries, Lo
     boolean existsByUserIdAndTmdbId(Long userId, long tmdbId);
     Optional<LibrarySeries> findByUserIdAndTmdbId(Long userId, long tmdbId);
 
-    @EntityGraph(attributePaths = {"seasons", "seasons.episodes"})
-    List<LibrarySeries> findByUserId(Long userId);  // NEW - see design decision 8
+    @EntityGraph(attributePaths = {"seasons"})
+    List<LibrarySeries> findByUserId(Long userId);  // NEW - see design decision 8 (revised r2)
 }
 ```
 Both new finder methods must handle "no rows for this user" without throwing - `List.of()`, not
 `null` and not an exception - the cross-story repository invariant, same as every existing finder
 on both repositories. `findByUserId`'s `@EntityGraph` is mandatory, not optional: without it,
-`series.getSeasons()` / `season.getEpisodes()` throw `LazyInitializationException` once the
-repository call's session closes under this project's `spring.jpa.open-in-view: false` (design
-decision 8).
+`series.getSeasons()` throws `LazyInitializationException` once the repository call's session
+closes under this project's `spring.jpa.open-in-view: false` (design decision 8). It fetches only
+`seasons`, not `seasons.episodes` - a two-level bag fetch here would throw
+`MultipleBagFetchException` (design decision 8, revised round 2). Episode initialization is a
+separate concern, handled by `LibrarySeasonRepository` below.
+
+### `com.streamvault.backend.library.LibrarySeasonRepository` (new)
+```java
+public interface LibrarySeasonRepository extends JpaRepository<LibrarySeason, Long> {
+
+    @Query("SELECT DISTINCT s FROM LibrarySeason s LEFT JOIN FETCH s.episodes "
+            + "WHERE s.librarySeries.id IN :seriesIds")
+    List<LibrarySeason> findSeasonsWithEpisodesByLibrarySeriesIdIn(
+            @Param("seriesIds") List<Long> seriesIds);  // NEW - see design decision 8 (added r2)
+}
+```
+New repository, added in round 2 - story-008 never needed one since saving a `LibrarySeries` root
+cascades its seasons and episodes in one `save(...)` call. `findSeasonsWithEpisodesByLibrarySeriesIdIn`
+must handle an empty `seriesIds` list without throwing (`LibraryService` is expected to only call it
+when `findByUserId` returned at least one series, per design decision 8, but the method itself still
+follows the same "no match is `List.of()`, not an exception" invariant as every other finder on
+either repository). Must be called from within the same `@Transactional` boundary as the
+`findByUserId` call whose results it is meant to populate (`LibraryService.list(...)`'s own
+`@Transactional(readOnly = true)`) - called standalone, outside any already-open transaction, it
+still returns correctly fetched `LibrarySeason` entities, but they will not be the same object
+instances as those hanging off a separately-loaded `LibrarySeries.getSeasons()`.
 
 ### `com.streamvault.backend.library.dto.LibraryListRequest`
 ```java
@@ -356,7 +401,8 @@ public class LibraryService {
     private static final int DEFAULT_PAGE_SIZE = 20;
 
     public LibraryService(LibraryMovieRepository libraryMovieRepository,
-            LibrarySeriesRepository librarySeriesRepository);
+            LibrarySeriesRepository librarySeriesRepository,
+            LibrarySeasonRepository librarySeasonRepository);  // librarySeasonRepository added r2
 
     @Transactional(readOnly = true)  // see design decision 8
     public LibraryListResponse list(Long userId, List<LibraryItemType> types,
@@ -371,11 +417,17 @@ Algorithm:
 4. If `MOVIE` is in the effective type set, `libraryMovieRepository.findByUserId(userId)`; map each
    to a `LibraryItemResponse` (`status` = the stored `WatchStatus.name()`). Otherwise skip the
    movie query entirely.
-5. If `SERIES` is in the effective type set, `librarySeriesRepository.findByUserId(userId)`; map
-   each to a `LibraryItemResponse` (`status` = `WatchStatusRollup.seriesStatus(series).name()`),
-   relying on `findByUserId`'s `@EntityGraph` having already initialized `seasons` and
-   `seasons.episodes` (design decision 8) - no lazy access occurs on a closed session. Otherwise
-   skip the series query entirely.
+5. If `SERIES` is in the effective type set: call `librarySeriesRepository.findByUserId(userId)`.
+   If that returns at least one series, collect their ids and call
+   `librarySeasonRepository.findSeasonsWithEpisodesByLibrarySeriesIdIn(seriesIds)` once (not once per
+   series) so the already-loaded `LibrarySeries.getSeasons()` collections have their `episodes`
+   populated by entity identity within the same session (design decision 8, revised round 2) - skip
+   this second call entirely when `findByUserId` returned no series, since there is nothing to
+   eager-fetch. Map each series to a `LibraryItemResponse` (`status` =
+   `WatchStatusRollup.seriesStatus(series).name()`); no lazy access occurs on a closed session,
+   because both repository calls run inside this method's own `@Transactional(readOnly = true)`
+   boundary. Otherwise (SERIES not in the effective type set) skip the whole series branch,
+   including the episode fetch.
 6. Concatenate both lists, then keep only items whose `status` is in the effective status set
    (AC-4, AC-5).
 7. Sort by `addedAt` descending, then `type` ascending, then `id` ascending (design decision 1).

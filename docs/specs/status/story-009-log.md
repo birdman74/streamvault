@@ -10,6 +10,46 @@ PR: none yet
 
 ---
 
+## Phase 1 Design Review: Test round 2 revision (2026-11-06)
+
+Responds to `docs/specs/design/story-009-dev-feedback-r2.md`. Full detail in
+`docs/specs/design/story-009-test-revision-r2.md`. Concern 1 accepted as technically valid - verified
+independently by reading `LibrarySeries.java`/`LibrarySeason.java` before accepting Dev's claim,
+rather than taking it on faith; both `seasons` and `episodes` are confirmed `List`-typed bags. No AC
+or invariant coverage dropped.
+
+**Fix adopted** (Dev's suggestion, one correction): split the single two-level `@EntityGraph` into
+two queries sharing one session.
+- `LibrarySeriesRepository.findByUserId` now carries `@EntityGraph(attributePaths = {"seasons"})`
+  only (single bag, safe).
+- New repository `LibrarySeasonRepository.findSeasonsWithEpisodesByLibrarySeriesIdIn(seriesIds)` -
+  `@Query("SELECT DISTINCT s FROM LibrarySeason s LEFT JOIN FETCH s.episodes WHERE
+  s.librarySeries.id IN :seriesIds")`, called once per `list(...)` call only when `findByUserId`
+  returned at least one series. Correction to Dev's sketch: the real field on `LibrarySeason`
+  referencing its parent is `librarySeries`, not `series` (`LibrarySeason.java:35`).
+- `LibraryService`'s constructor gains `LibrarySeasonRepository` as a third dependency; algorithm
+  step 5 rewritten to call both repositories, relying on `@Transactional(readOnly = true)` (unchanged
+  from round 1) to make both calls join one session under Spring's default `REQUIRED` propagation.
+  Still 2 queries total for the series branch per call, regardless of library size.
+
+**Test changes**: the single eager-fetch invariant row/test is split into three, matching the two-
+query design - `LibrarySeriesRepositoryEagerFetchTest` retargeted to assert only `seasons` (method
+renamed `should_haveSeasonsAlreadyInitialized_when_accessedAfterFindByUserIdReturns`); new
+`LibrarySeasonRepositoryEagerFetchTest` for the episode fetch in isolation; new
+`LibraryServiceEagerFetchIntegrationTest`, autowiring the real `LibraryService` (not Mockito-mocked),
+proving the two repository calls actually share one session when made from inside `list(...)` -
+asserts the specific rolled-up status (`CURRENTLY_WATCHING` from a seeded mix of `WATCHED` and
+`PLANNED` seasons) rather than only "no exception," since a partially-initialized collection would
+silently roll up to the wrong status instead of throwing.
+
+Ran `mvn test-compile` against the real story-007/008 production code: all three eager-fetch test
+files fail only on "cannot find symbol" for not-yet-implemented production code
+(`LibrarySeasonRepository`, `LibraryService`, `LibraryListResponse`, `findByUserId`) - same expected
+Phase 1 RED state as the rest of the story, no unrelated compile error. Awaiting Dev's response to
+this revision.
+
+---
+
 ## Phase 1 Design Review: Dev round 2 (2026-11-06)
 
 Responds to `docs/specs/design/story-009-test-revision-r1.md`. Full detail in

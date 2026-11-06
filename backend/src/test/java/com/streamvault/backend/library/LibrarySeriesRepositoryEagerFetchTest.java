@@ -24,9 +24,19 @@ import com.streamvault.backend.user.UserRepository;
  *
  * <p>With {@code spring.jpa.open-in-view: false} (this project's actual {@code application.yml})
  * and no outer transaction, the Hibernate session used by {@code findByUserId} closes the moment
- * the call returns. {@code seasons} and {@code seasons.episodes} must already be initialized by
- * then, or every caller that walks into them afterwards - {@code WatchStatusRollup.seriesStatus}
- * included - throws {@code LazyInitializationException}.
+ * the call returns. {@code seasons} must already be initialized by then, or every caller that
+ * walks into it afterwards throws {@code LazyInitializationException}.
+ *
+ * <p>Revised round 2 (story-009-dev-feedback-r2.md, Concern 1): this test originally also asserted
+ * that {@code seasons.episodes} was initialized by this same call, under a two-level
+ * {@code @EntityGraph(attributePaths = {"seasons", "seasons.episodes"})}. Dev found that two nested
+ * bag paths in one entity graph throws {@code MultipleBagFetchException} against this project's
+ * actual mappings ({@code LibrarySeries.seasons} / {@code LibrarySeason.episodes} are both
+ * {@code List}-typed, i.e. Hibernate bags). {@code findByUserId} now only fetches {@code seasons};
+ * episode initialization is a separate repository call proved by
+ * {@code LibrarySeasonRepositoryEagerFetchTest}, and the two calls sharing one session when made
+ * from inside {@code LibraryService.list(...)} is proved by
+ * {@code LibraryServiceEagerFetchIntegrationTest}.
  *
  * <p>Deliberately NOT {@code @Transactional} at the class or method level: that would keep the
  * Hibernate session open for the whole test and silently hide the exact bug this test exists to
@@ -63,7 +73,7 @@ class LibrarySeriesRepositoryEagerFetchTest {
     }
 
     @Test
-    void should_haveSeasonsAndEpisodesAlreadyInitialized_when_accessedAfterFindByUserIdReturns() {
+    void should_haveSeasonsAlreadyInitialized_when_accessedAfterFindByUserIdReturns() {
         Long userId = userRepository
                 .save(new User("library-series-eager-fetch@example.com", "bcrypt-hash"))
                 .getId();
@@ -82,8 +92,6 @@ class LibrarySeriesRepositoryEagerFetchTest {
 
         LibrarySeries loaded = found.get(0);
         assertThat(loaded.getSeasons()).hasSize(2);
-        assertThat(loaded.getSeasons().get(1).getEpisodes()).hasSize(2);
-        assertThat(loaded.getSeasons().get(1).getEpisodes().get(0).getTitle())
-                .isEqualTo("Winter Is Coming");
+        assertThat(loaded.getSeasons().get(1).getSeasonNumber()).isEqualTo(1);
     }
 }

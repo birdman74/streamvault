@@ -24,9 +24,12 @@ import org.junit.jupiter.api.Test;
  *       {@code JdbcTemplate}, {@code MongoTemplate}) so they do not false-match explanatory prose.</li>
  *   <li>The Flyway migration set is pinned to an explicit list, so a later edit cannot quietly add
  *       persistence under a TMDB-read feature. STORY-007 (Add Movie from TMDB to Library) legitimately
- *       adds {@code V5__create_library_movies_table.sql} for its own {@code library_movies} table;
- *       that one entry is added here as a documented cross-story amendment, not a silent change, and
- *       the guard otherwise still holds.</li>
+ *       adds {@code V5__create_library_movies_table.sql} for its own {@code library_movies} table,
+ *       and STORY-008 (Add TV Series from TMDB to Library) legitimately adds
+ *       {@code V6__create_library_series_tables.sql} for its {@code library_series} /
+ *       {@code library_seasons} / {@code library_episodes} tables; both entries are added here as
+ *       documented cross-story amendments, not silent changes, and the guard otherwise still
+ *       holds.</li>
  * </ol>
  *
  * Until Dev creates the {@code tmdb} main package this test fails on the first assertion, which is
@@ -81,15 +84,18 @@ class TmdbPackageReadOnlyConventionTest {
         }
 
         assertThat(migrations)
-                .as("the migration set is pinned; story-006 adds nothing, and STORY-007 adds only "
-                        + "V5__create_library_movies_table.sql for its library_movies table "
-                        + "(documented amendment, see class javadoc)")
+                .as("the migration set is pinned; story-006 adds nothing, STORY-007 adds "
+                        + "V5__create_library_movies_table.sql for its library_movies table, and "
+                        + "STORY-008 adds V6__create_library_series_tables.sql for its "
+                        + "library_series / library_seasons / library_episodes tables "
+                        + "(documented amendments, see class javadoc)")
                 .containsExactly(
                         "V1__create_users_table.sql",
                         "V2__add_google_id_to_users.sql",
                         "V3__add_users_password_or_google_check.sql",
                         "V4__add_rating_type_to_users.sql",
-                        "V5__create_library_movies_table.sql");
+                        "V5__create_library_movies_table.sql",
+                        "V6__create_library_series_tables.sql");
     }
 
     private Stream<JavaSource> javaSourcesUnder(Path root) throws IOException {

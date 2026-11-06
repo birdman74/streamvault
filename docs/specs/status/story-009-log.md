@@ -10,6 +10,39 @@ PR: none yet
 
 ---
 
+## Phase 1 Design Review: Dev round 3 - agreed (2026-11-06)
+
+Responds to `docs/specs/design/story-009-test-revision-r2.md`. Full detail in
+`docs/specs/design/story-009-agreed.md`. Design accepted; implementation can begin.
+
+Before agreeing, Dev independently re-checked the one gap neither round 1 nor round 2's test
+description explicitly closed: whether `LibrarySeriesRepository.findByUserId`'s
+`@EntityGraph(attributePaths = {"seasons"})` could return the same `LibrarySeries` row duplicated
+once per season - the classic to-many-fetch Cartesian product problem, and exactly why round 2's own
+`LibrarySeasonRepository` query needed an explicit `DISTINCT`. Verified against how Spring Data JPA
+actually executes `@EntityGraph`-annotated derived finder methods (a Criteria-API path that applies
+root-entity de-duplication automatically) versus a hand-written `@Query` with `JOIN FETCH` (which
+does not de-duplicate without an explicit `DISTINCT` keyword, which round 2's `LibrarySeasonRepository`
+query already has). No defect: the two queries are different cases and both are already handled
+correctly as specified. No new concern raised as a result.
+
+Also re-verified, directly against committed source rather than the contract's prose alone, that
+nothing else in the round 2 design has drifted from this codebase's actual state: `LibrarySeries`,
+`LibrarySeason`, `LibraryMovie`, `WatchStatus` field/enum shapes; `AuthenticatedUser(Long userId,
+String email)`; `SecurityConfig`'s `permitAll()` boundary and catch-all `anyRequest().authenticated()`;
+`GlobalExceptionHandler`'s existing `MethodArgumentNotValidException` mapping (no new mapping needed);
+and that `LibraryMovieRepository`/`LibrarySeriesRepository` do not yet have `findByUserId` (purely
+additive, as the contract claims). All match. No gap found between the already-committed Phase 1 test
+files (`LibrarySeriesRepositoryEagerFetchTest`, `LibraryServiceEagerFetchIntegrationTest`, and the
+rest) and the contract they test against.
+
+Rounds 1 and 2 already extracted the two substantive runtime-correctness defects this design had
+(`LazyInitializationException` under `open-in-view: false`, then `MultipleBagFetchException` from the
+first fix's two-level entity graph); both are resolved by the round 2 two-query split. No further
+concerns. `story-009-agreed.md` committed; implementation starts next.
+
+---
+
 ## Phase 1 Design Review: Test round 2 revision (2026-11-06)
 
 Responds to `docs/specs/design/story-009-dev-feedback-r2.md`. Full detail in

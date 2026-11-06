@@ -78,6 +78,26 @@ here for Dev and Brian's visibility, same discipline as story-007/008.
    have `id = 1` for the same user). Any future story acting on one merged-list item must key off
    `(type, id)`, not `id` alone. Documented here so STORY-010 / STORY-011 / STORY-012 do not assume
    global uniqueness of the bare `id` this endpoint returns.
+8. **`LibrarySeriesRepository.findByUserId` carries an explicit `@EntityGraph(attributePaths =
+   {"seasons", "seasons.episodes"})`, and `LibraryService.list(...)` is `@Transactional(readOnly =
+   true)`.** Accepted from Dev's round 1 feedback (`story-009-dev-feedback-r1.md`, Concerns 1 and 2)
+   rather than left implicit. This project's `application.yml` sets `spring.jpa.open-in-view: false`,
+   and `LibrarySeries.seasons` / `LibrarySeason.episodes` are both default-`LAZY`
+   `@OneToMany`. STORY-009 is the first place in this codebase that loads a `LibrarySeries` via a
+   repository query and then walks into `seasons` / `seasons.episodes` afterward - every existing
+   read of those collections (`LibrarySeriesService`, mapping to `LibrarySeriesResponse`) walks an
+   entity graph just built in Java memory within the same call, never one freshly loaded from the
+   database. Without an explicit fetch strategy, the Hibernate session closes the moment
+   `findByUserId` returns, and `WatchStatusRollup.seriesStatus(...)` would hit uninitialized proxies
+   with no session - a `LazyInitializationException` on every request that includes a series, which
+   is the normal case for AC-1, AC-2, and AC-4, not an edge case. The single `@EntityGraph` fetches
+   `seasons` and `seasons.episodes` in one query per call, which also resolves Dev's second concern
+   (an unguarded N+1 - one seasons query plus one episodes-per-season query, on every single
+   `GET /api/library` call, since design decision 3 requires every series' rollup computed for both
+   display and status-filtering on every request, not just the returned page) without a second round
+   trip. `@Transactional(readOnly = true)` on the service method is the explicit transactional
+   boundary Dev asked the contract to state rather than leave to Spring Data's per-repository-call
+   default.
 
 ## Spec clarification already surfaced to Brian
 
@@ -104,6 +124,32 @@ needed on this story's part beyond existing - the isolation guarantee those stor
 (every write bound to `principal.userId()`) is exactly what this endpoint's own user-scoping relies
 on.
 
+## Response to Dev's round 1 Question 1
+
+Dev asked whether repeated query params binding onto a `List<Enum>` record constructor parameter
+(`?type=MOVIE&type=SERIES` -> `LibraryListRequest.type`) has precedent in this codebase, since
+`TmdbBrowseRequest` / `TmdbSearchRequest` - cited by this contract as precedent for the
+unrecognized-value-is-400 behavior - only ever bind a single scalar value, not a repeated/list-valued
+one.
+
+Confirmed experimentally rather than by citation: a throwaway `@WebMvcTest` spike (a scratch
+top-level `@RestController` plus a `record SpikeRequest(List<SpikeType> type)`, no production code
+touched, deleted before this revision was committed) against this project's exact dependency set
+(Spring Boot 3.5.16 / Spring Framework 6.2.19) showed:
+
+- `?type=MOVIE&type=SERIES` binds onto `List<SpikeType> type` correctly - both repeated values land
+  in the list, in request order.
+- `?type=MOVIE&type=BOGUS` (one recognized element, one not) does **not** throw a raw
+  `MethodArgumentTypeMismatchException` that would bypass the existing handler. It still routes
+  through `MethodArgumentNotValidException`, auto-detected by `@WebMvcTest` as it always is for this
+  codebase's `@RestControllerAdvice`, producing the same `{"error": "Validation failed", "fields":
+  {"type": "..."}}` 400 envelope as every other validated endpoint.
+
+Both of `LibraryControllerTest`'s existing `should_bindRepeatedTypeQueryParamsIntoAList_...` and
+`should_return400_when_typeIsNotARecognizedConstant` tests (committed in the Phase 1 RED state) rest
+on exactly this mechanism; no change was needed to either test or to the `LibraryListRequest`
+contract. No fallback (e.g. binding `List<String>` and converting manually) is needed.
+
 ## Endpoint: `GET /api/library`
 
 Returns every item in the authenticated user's own library, movies and series together, optionally
@@ -117,7 +163,7 @@ existing `MethodArgumentNotValidException` handler (400, shared `fields` envelop
 
 | Param | Type | Rules |
 |---|---|---|
-| `type` | zero or more of `MOVIE`, `SERIES` | repeatable query param (`?type=MOVIE&type=SERIES`); absent or empty means both types (AC-3). Case-sensitive exact constant match; an unrecognized value is a 400 with `fields.type`. |
+| `type` | zero or more of `MOVIE`, `SERIES` | repeatable query param (`?type=MOVIE&type=SERIES`); absent or empty means both types (AC-3). Case-sensitive exact constant match; an unrecognized value is a 400 with `fields.type`. Confirmed experimentally (see "Response to Dev's round 1 Question 1" below), not just by analogy to `TmdbBrowseRequest`. |
 | `status` | zero or more of `PLANNED`, `CURRENTLY_WATCHING`, `WATCHED` | repeatable query param (`?status=PLANNED&status=WATCHED`); absent or empty means all three statuses (AC-4). Case-sensitive exact constant match; an unrecognized value is a 400 with `fields.status`. |
 | `page` | number (int) | optional, `@Min(1)`; a value below `1` is a 400. Defaults to `1` when omitted. |
 | `pageSize` | number (int) | optional, `@Min(1) @Max(100)`; a value outside `[1, 100]` is a 400. Defaults to `20` when omitted. |
@@ -251,12 +297,17 @@ public interface LibraryMovieRepository extends JpaRepository<LibraryMovie, Long
 public interface LibrarySeriesRepository extends JpaRepository<LibrarySeries, Long> {
     boolean existsByUserIdAndTmdbId(Long userId, long tmdbId);
     Optional<LibrarySeries> findByUserIdAndTmdbId(Long userId, long tmdbId);
-    List<LibrarySeries> findByUserId(Long userId);  // NEW
+
+    @EntityGraph(attributePaths = {"seasons", "seasons.episodes"})
+    List<LibrarySeries> findByUserId(Long userId);  // NEW - see design decision 8
 }
 ```
 Both new finder methods must handle "no rows for this user" without throwing - `List.of()`, not
 `null` and not an exception - the cross-story repository invariant, same as every existing finder
-on both repositories.
+on both repositories. `findByUserId`'s `@EntityGraph` is mandatory, not optional: without it,
+`series.getSeasons()` / `season.getEpisodes()` throw `LazyInitializationException` once the
+repository call's session closes under this project's `spring.jpa.open-in-view: false` (design
+decision 8).
 
 ### `com.streamvault.backend.library.dto.LibraryListRequest`
 ```java
@@ -307,6 +358,7 @@ public class LibraryService {
     public LibraryService(LibraryMovieRepository libraryMovieRepository,
             LibrarySeriesRepository librarySeriesRepository);
 
+    @Transactional(readOnly = true)  // see design decision 8
     public LibraryListResponse list(Long userId, List<LibraryItemType> types,
             List<WatchStatus> statuses, Integer page, Integer pageSize);
 }
@@ -320,8 +372,10 @@ Algorithm:
    to a `LibraryItemResponse` (`status` = the stored `WatchStatus.name()`). Otherwise skip the
    movie query entirely.
 5. If `SERIES` is in the effective type set, `librarySeriesRepository.findByUserId(userId)`; map
-   each to a `LibraryItemResponse` (`status` = `WatchStatusRollup.seriesStatus(series).name()`).
-   Otherwise skip the series query entirely.
+   each to a `LibraryItemResponse` (`status` = `WatchStatusRollup.seriesStatus(series).name()`),
+   relying on `findByUserId`'s `@EntityGraph` having already initialized `seasons` and
+   `seasons.episodes` (design decision 8) - no lazy access occurs on a closed session. Otherwise
+   skip the series query entirely.
 6. Concatenate both lists, then keep only items whose `status` is in the effective status set
    (AC-4, AC-5).
 7. Sort by `addedAt` descending, then `type` ascending, then `id` ascending (design decision 1).

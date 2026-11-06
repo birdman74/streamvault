@@ -32,6 +32,7 @@ a derived value from STORY-012's not-yet-implemented roll-up rule.
 | `LibraryMovie` / `LibrarySeries` / `LibrarySeason` / `LibraryEpisode` entities (STORY-007, STORY-008) are read-only from this story's perspective - no setter is added, no field changes | No test needed; `LibraryServiceTest` constructs fixtures using only each entity's existing public constructor and `addSeason` / `addEpisode` helpers, identical to `LibrarySeriesServiceTest`'s existing fixture style. |
 | JWT generation is untouched | This story changes no auth/JWT code. `JwtServiceTest` and `SecurityConfigAuthFlowTest` re-run unchanged in the Phase 3 suite. |
 | No Flyway migration is added | `TmdbPackageReadOnlyConventionTest.should_notAddAnyNewFlywayMigration_when_theStoryIsImplemented` re-runs **unchanged** (still pinned at V1..V6) - this story adds no table, so unlike story-007/008 this guard needs no amendment. |
+| A `LibrarySeries` loaded by a repository query - not one just built in Java memory in the same call, as every existing read in this codebase does today - must have `seasons` / `seasons.episodes` already initialized, since `spring.jpa.open-in-view: false` means the Hibernate session closes the moment the repository call returns (added in response to Dev's round 1 feedback, Concerns 1/2; design decision 8) | `LibrarySeriesRepositoryEagerFetchTest.should_haveSeasonsAndEpisodesAlreadyInitialized_when_accessedAfterFindByUserIdReturns` |
 
 ## API Contracts
 
@@ -74,7 +75,11 @@ endpoint with no write path and no TMDB call:
   and one series item asserting every `LibraryItemResponse` field), the principal id threading into
   the service, repeated `type=`/`status=` query parameters reaching the service as lists, and the
   400 mappings for an unrecognized `type`/`status` value and an out-of-bounds `page`/`pageSize`.
-  Cannot assert 401 (filters off) - that is Layer 2.
+  Cannot assert 401 (filters off) - that is Layer 2. The repeated-query-param-into-`List<Enum>`
+  binding path these tests depend on (`should_bindRepeatedTypeQueryParamsIntoAList_...` and friends)
+  was confirmed experimentally against this project's actual Spring Boot 3.5.16 / Spring Framework
+  6.2.19 in response to Dev's round 1 Question 1 - see "Response to Dev's round 1 Question 1" in
+  `story-009-api-contracts.md`. No change was needed to these tests or to `LibraryListRequest`.
 
 - **Principal convention test (`library/LibraryControllerPrincipalConventionTest`)** - mirrors
   `LibraryMovieControllerPrincipalConventionTest`. Pins that the owning user id is always
@@ -90,6 +95,19 @@ endpoint with no write path and no TMDB call:
     `findByUserId` finder: the empty-list-not-exception invariant, a round-trip returning every row
     belonging to the queried user, and that another user's rows are excluded (AC-7). No existing
     method in either file is changed.
+
+- **New: `library/LibrarySeriesRepositoryEagerFetchTest`** - a dedicated `@SpringBootTest` + H2
+  file, added in response to Dev's round 1 feedback (Concerns 1/2), not amended into
+  `LibrarySeriesRepositoryTest`. Deliberately carries no class- or method-level `@Transactional`:
+  that would keep the Hibernate session open for the whole test and silently hide the exact bug this
+  test exists to catch. Each repository call (`save`, then `findByUserId`) therefore runs in its own
+  self-contained transaction exactly as it would on the real `GET /api/library` request path under
+  `spring.jpa.open-in-view: false`, and the single test method cleans up for itself in an `@AfterEach`
+  rather than relying on test-transaction rollback. Saves a series with two seasons (one with an
+  episode, one with two), calls `findByUserId`, and asserts `getSeasons()` /
+  `getSeasons().get(1).getEpisodes()` are both already populated with no open session - this fails
+  with an uncaught `LazyInitializationException` if `findByUserId`'s `@EntityGraph` (design decision
+  8) is ever dropped or narrowed.
 
 - **Security / end-to-end integration test (`library/LibraryListEndpointsSecurityTest`)** -
   `@SpringBootTest(webEnvironment = MOCK)` + `@AutoConfigureMockMvc` (real filter chain), H2, real
@@ -111,7 +129,8 @@ endpoint with no write path and no TMDB call:
 finder methods do not exist yet. The test module fails at `test-compile`, consistent with
 story-002/005/006/007/008's expected Phase 1 RED. The two amended repository test files
 (`LibraryMovieRepositoryTest`, `LibrarySeriesRepositoryTest`) also fail to compile, since their new
-methods call the not-yet-existing `findByUserId`.
+methods call the not-yet-existing `findByUserId`, and the new
+`LibrarySeriesRepositoryEagerFetchTest` fails to compile for the same reason.
 
 ## Out of Scope
 

@@ -10,6 +10,36 @@ PR: none yet
 
 ---
 
+## Phase 1 Design Review: Test round 1 revision (2026-11-06)
+
+Responds to `docs/specs/design/story-009-dev-feedback-r1.md`. Full detail in
+`docs/specs/design/story-009-test-revision-r1.md`. Both of Dev's concerns accepted as technically
+valid; the binding question answered experimentally. No AC or invariant coverage dropped.
+
+1. **Concern 1/2 (LazyInitializationException + N+1), accepted and resolved together**: new design
+   decision 8 in the api-contracts doc - `LibrarySeriesRepository.findByUserId` now carries
+   `@EntityGraph(attributePaths = {"seasons", "seasons.episodes"})`, and `LibraryService.list(...)`
+   is `@Transactional(readOnly = true)`, exactly the fix Dev suggested. New cross-story invariant
+   added to the test plan, with a new dedicated test file,
+   `LibrarySeriesRepositoryEagerFetchTest`, deliberately carrying no `@Transactional` so it exercises
+   the real session-closing behavior under `spring.jpa.open-in-view: false` instead of the existing
+   `LibrarySeriesRepositoryTest`'s class-level `@Transactional`, which would mask the bug. Verified
+   the new file compiles against the real, already-implemented story-007/008 entities and fails
+   only on the expected not-yet-existing `findByUserId` symbol - the same RED state as the rest of
+   the story.
+2. **Question 1 (repeated query param -> `List<Enum>` record binding), confirmed experimentally**:
+   built a throwaway `@WebMvcTest` spike against this project's actual Spring Boot 3.5.16 / Spring
+   Framework 6.2.19 (no production code touched, deleted before this revision was committed) and
+   confirmed both that the binding works and that an unrecognized element still routes through
+   `MethodArgumentNotValidException` rather than bypassing the existing 400 handler. No test or
+   contract change was needed as a result; this is recorded in a new "Response to Dev's round 1
+   Question 1" section of the api-contracts doc for Dev's visibility.
+
+No pushback from Test on anything in Dev's feedback - both concerns were correct reads of this
+codebase's actual JPA configuration, not theoretical. Awaiting Dev's response to this revision.
+
+---
+
 ## Phase 1 Design Review: Dev round 1 (2026-11-06)
 
 Dev reviewed `story-009-test-plan.md` and `story-009-api-contracts.md` against the PO story and

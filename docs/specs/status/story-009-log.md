@@ -10,6 +10,46 @@ PR: none yet
 
 ---
 
+## Phase 1 Design Review: Dev round 1 (2026-11-06)
+
+Dev reviewed `story-009-test-plan.md` and `story-009-api-contracts.md` against the PO story and
+against this codebase's actual source (not just the contract's prose). Verdict: needs revision,
+`docs/specs/design/story-009-dev-feedback-r1.md` committed. The merge/filter/sort/paginate algorithm,
+pagination design, response shape, and `WatchStatusRollup` derivation rule are agreed as specified -
+no objection to the overall design.
+
+Two concerns raised, both about runtime correctness under this project's actual JPA configuration
+rather than the algorithm itself:
+
+1. **`WatchStatusRollup.seriesStatus(series)` will throw `LazyInitializationException` as
+   contracted.** `backend/src/main/resources/application.yml` sets `spring.jpa.open-in-view: false`;
+   `LibrarySeries.seasons` and `LibrarySeason.episodes` are both default-`LAZY`. Every existing read
+   of `getSeasons()`/`getEpisodes()` in the codebase today (`LibrarySeriesService`) only ever walks
+   entities just built in Java memory within the same add-series call, never a `LibrarySeries`
+   freshly loaded from the database - STORY-009's `findByUserId` is the first time this codebase
+   loads a series from the DB and then walks into its seasons/episodes afterward. With no
+   `@Transactional` and no eager-fetch strategy specified on the new finder, the session closes
+   before `WatchStatusRollup.seriesStatus` runs, so this throws on every request that includes a
+   series - the normal case, not an edge case. Dev asked Test to pick an explicit fix (e.g.
+   `@Transactional(readOnly = true)` on `LibraryService.list` plus an `@EntityGraph` on
+   `LibrarySeriesRepository.findByUserId` covering `seasons` and `seasons.episodes`) and state it in
+   the contract.
+2. **Once fixed, the fetch strategy should also avoid N+1 per series on every request**, since
+   design decision 3 requires every series' rollup computed on every call (for filtering), not just
+   the returned page. Suggested folding this into the same `@EntityGraph` fix as concern 1.
+
+One non-blocking question: whether repeated query params binding into a `List<Enum>` record
+constructor parameter (`?type=MOVIE&type=SERIES` -> `LibraryListRequest.type`) has precedent in this
+codebase. Checked `TmdbBrowseRequest`/`TmdbSearchRequest`, cited by the contract as precedent for the
+unrecognized-value-is-400 behavior - both only bind a single scalar value, not a repeated/list-valued
+one. Asked Test to confirm this binds as expected and still routes a bad element through the existing
+`MethodArgumentNotValidException` handler before Dev relies on it.
+
+No pushback on PO acceptance criteria, `SecurityConfig`, ADR-001 compliance, or the
+`GlobalExceptionHandler` non-change - all agreed as specified.
+
+---
+
 ## Phase 1: Test goes first
 
 Complete on branch `feature/story-009-view-filter-library`, cut from `main` after STORY-008

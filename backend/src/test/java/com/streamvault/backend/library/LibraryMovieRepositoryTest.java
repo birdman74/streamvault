@@ -2,6 +2,7 @@ package com.streamvault.backend.library;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -99,5 +100,41 @@ class LibraryMovieRepositoryTest {
 
         assertThat(libraryMovieRepository.findByUserIdAndTmdbId(userB, 27205L)).isEmpty();
         assertThat(libraryMovieRepository.existsByUserIdAndTmdbId(userB, 27205L)).isFalse();
+    }
+
+    /*
+     * Contract lives in docs/specs/design/story-009-api-contracts.md. findByUserId does not exist
+     * yet; these methods are expected to fail to compile until Dev implements it.
+     */
+
+    @Test
+    void should_returnAnEmptyList_when_noMovieExistsForTheUser() {
+        assertThat(libraryMovieRepository.findByUserId(userA)).isEmpty();
+    }
+
+    @Test
+    void should_returnEveryMovieForTheUser_when_findByUserIdIsCalled() {
+        libraryMovieRepository.save(new LibraryMovie(userA, 27205L, "Inception", 2010, null,
+                WatchStatus.WATCHED));
+        libraryMovieRepository.save(new LibraryMovie(userA, 550L, "Fight Club", 1999, null,
+                WatchStatus.PLANNED));
+
+        List<LibraryMovie> found = libraryMovieRepository.findByUserId(userA);
+
+        assertThat(found).hasSize(2);
+        assertThat(found).extracting(LibraryMovie::getTitle)
+                .containsExactlyInAnyOrder("Inception", "Fight Club");
+    }
+
+    @Test
+    void should_excludeAnotherUsersMovies_when_findByUserIdIsCalled() {
+        libraryMovieRepository.save(new LibraryMovie(userA, 27205L, "Inception", 2010, null,
+                WatchStatus.WATCHED));
+        libraryMovieRepository.save(new LibraryMovie(userB, 550L, "Fight Club", 1999, null,
+                WatchStatus.PLANNED));
+
+        List<LibraryMovie> found = libraryMovieRepository.findByUserId(userA);
+
+        assertThat(found).extracting(LibraryMovie::getTitle).containsExactly("Inception");
     }
 }

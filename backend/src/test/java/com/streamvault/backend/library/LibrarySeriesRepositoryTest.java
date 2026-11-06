@@ -2,6 +2,7 @@ package com.streamvault.backend.library;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -119,5 +120,37 @@ class LibrarySeriesRepositoryTest {
 
         assertThat(librarySeriesRepository.findByUserIdAndTmdbId(userB, 1399L)).isEmpty();
         assertThat(librarySeriesRepository.existsByUserIdAndTmdbId(userB, 1399L)).isFalse();
+    }
+
+    /*
+     * Contract lives in docs/specs/design/story-009-api-contracts.md. findByUserId does not exist
+     * yet; these methods are expected to fail to compile until Dev implements it.
+     */
+
+    @Test
+    void should_returnAnEmptyList_when_noSeriesExistsForTheUser() {
+        assertThat(librarySeriesRepository.findByUserId(userA)).isEmpty();
+    }
+
+    @Test
+    void should_returnEverySeriesForTheUser_when_findByUserIdIsCalled() {
+        librarySeriesRepository.save(gameOfThrones(userA));
+        librarySeriesRepository.save(new LibrarySeries(userA, 1396L, "Breaking Bad", 2008, null));
+
+        List<LibrarySeries> found = librarySeriesRepository.findByUserId(userA);
+
+        assertThat(found).hasSize(2);
+        assertThat(found).extracting(LibrarySeries::getTitle)
+                .containsExactlyInAnyOrder("Game of Thrones", "Breaking Bad");
+    }
+
+    @Test
+    void should_excludeAnotherUsersSeries_when_findByUserIdIsCalled() {
+        librarySeriesRepository.save(gameOfThrones(userA));
+        librarySeriesRepository.save(new LibrarySeries(userB, 1396L, "Breaking Bad", 2008, null));
+
+        List<LibrarySeries> found = librarySeriesRepository.findByUserId(userA);
+
+        assertThat(found).extracting(LibrarySeries::getTitle).containsExactly("Game of Thrones");
     }
 }

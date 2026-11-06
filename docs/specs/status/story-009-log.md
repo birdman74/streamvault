@@ -10,6 +10,36 @@ PR: none yet
 
 ---
 
+## Phase 1 Design Review: Dev round 2 (2026-11-06)
+
+Responds to `docs/specs/design/story-009-test-revision-r1.md`. Full detail in
+`docs/specs/design/story-009-dev-feedback-r2.md`. Needs revision, not agreement - but the gap is
+narrow: the `@Transactional(readOnly = true)` half of round 1's fix is fine; only the specific
+`@EntityGraph(attributePaths = {"seasons", "seasons.episodes"})` is the problem.
+
+Checked `LibrarySeries.seasons` and `LibrarySeason.episodes` directly in source rather than taking
+the contract's entity graph on faith: both are `List`-typed `@OneToMany` collections (Hibernate
+bags), not `Set`s. Requesting two nested `*ToMany` bag paths in one `@EntityGraph` is the known
+Hibernate `MultipleBagFetchException` trigger - it will throw the first time `findByUserId` executes
+against a series with at least one season, which is exactly the case Test's own new
+`LibrarySeriesRepositoryEagerFetchTest` is written to exercise. Same blast radius as the original
+round 1 bug (every request that includes a series), just a different exception at the same call
+site.
+
+Suggested fix that needs no entity class change (keeping the entities genuinely read-only per this
+story's own cross-story invariant): split into two fetches inside the same `@Transactional`
+service call - `@EntityGraph(attributePaths = {"seasons"})` alone on `findByUserId` (single bag,
+safe), plus a second query loading every episode for every season just fetched in one round trip
+(`LEFT JOIN FETCH ... WHERE season.series.id IN :seriesIds`), attaching onto the already-managed
+season entities within the same session. Still 2 queries total per call regardless of library size.
+Open to Test's own alternative (e.g. `Set`, `@BatchSize`, `FetchMode.SUBSELECT`) as long as it
+doesn't touch the entity classes - only objecting to the specific entity graph as written, since it
+won't run.
+
+No AC or invariant coverage disputed; everything else from round 1's revision remains agreed.
+
+---
+
 ## Phase 1 Design Review: Test round 1 revision (2026-11-06)
 
 Responds to `docs/specs/design/story-009-dev-feedback-r1.md`. Full detail in

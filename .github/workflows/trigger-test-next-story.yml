@@ -1,5 +1,5 @@
 # Guard pattern: see docs/adr/ADR-002-push-trigger-guard-pattern.md
-name: Trigger Test — Next Story from Queue
+name: Trigger Test - Next Story from Queue
 
 on:
   push:
@@ -35,14 +35,27 @@ jobs:
         id: file_check
         if: github.event_name == 'push'
         run: |
-          CHANGED=$(git diff-tree --no-commit-id --name-only -r ${{ github.sha }} | grep -E '^docs/specs/story-.*\.md$' || true)
+          # First-parent diff (ADR-002): lists the files this commit brought
+          # into main. Works for regular, squash and merge commits alike.
+          # git diff-tree without -m lists nothing for a merge commit, so it
+          # silently skipped every spec change merged through a PR.
+          CHANGED=$(git diff --name-only ${{ github.sha }}^1 ${{ github.sha }} | grep -E '^docs/specs/story-.*\.md$' || true)
           if [ -z "$CHANGED" ]; then
             echo "story_file_changed=false" >> $GITHUB_OUTPUT
-            echo "No story spec files in the actual pushed commit (path filter matched on stale range, likely a force-push) — skipping."
+            echo "No story spec files in the actual pushed commit (path filter matched on stale range, likely a force-push) - skipping."
           else
             echo "story_file_changed=true" >> $GITHUB_OUTPUT
             echo "Story files changed: $CHANGED"
           fi
+
+      - name: Reconcile blocked labels after spec change
+        if: github.event_name == 'push' && steps.file_check.outputs.story_file_changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.QUEUE_MANAGER_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          chmod +x scripts/check-prerequisites.sh scripts/sync-blocked-labels.sh
+          ./scripts/sync-blocked-labels.sh
 
       - name: Close completed story issue
         if: |
@@ -51,31 +64,45 @@ jobs:
           startsWith(github.event.pull_request.head.ref, 'feature/')
         env:
           GH_TOKEN: ${{ secrets.QUEUE_MANAGER_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           BRANCH="${{ github.event.pull_request.head.ref }}"
-          STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+')
+          STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+' | head -1)
 
           if [ -z "$STORY_ID" ]; then
-            echo "Could not extract story ID from branch $BRANCH — skipping issue close."
+            echo "Could not extract story ID from branch $BRANCH - skipping issue close."
             exit 0
           fi
 
-          # Find and close the issue for this story, remove in-progress label
+          # Find the issue for this story (word-boundary match, so story-01
+          # can never match story-010)
           ISSUE_NUMBER=$(gh issue list \
             --label "story" \
             --state open \
+            --limit 500 \
             --json number,title \
-            --jq ".[] | select(.title | test(\"$STORY_ID\")) | .number" 2>/dev/null)
+            | jq -r --arg id "$STORY_ID" '[.[] | select(.title | test("\\b" + $id + "\\b")) | .number][0] // empty')
 
-          if [ -n "$ISSUE_NUMBER" ]; then
-            gh api \
-              --method DELETE \
-              /repos/birdman74/streamvault/issues/$ISSUE_NUMBER/labels/in-progress
-            gh issue close "$ISSUE_NUMBER" --comment "Completed — PR merged to main."
-            echo "Closed issue #$ISSUE_NUMBER for $STORY_ID"
-          else
-            echo "No open issue found for $STORY_ID — may have already been closed."
+          if [ -z "$ISSUE_NUMBER" ]; then
+            echo "No open issue found for $STORY_ID - may have already been closed."
+            exit 0
           fi
+
+          # Remove in-progress. A 404 means it is already gone, which is the
+          # desired end state, so it must not stop the issue from closing.
+          if ! API_RESPONSE=$(gh api --method DELETE \
+              "repos/{owner}/{repo}/issues/$ISSUE_NUMBER/labels/in-progress" 2>&1); then
+            if echo "$API_RESPONSE" | grep -q "HTTP 404"; then
+              echo "'in-progress' was already removed from #$ISSUE_NUMBER"
+            else
+              echo "$API_RESPONSE" >&2
+              exit 1
+            fi
+          fi
+
+          # Closed as completed: this is what unblocks dependent stories
+          gh issue close "$ISSUE_NUMBER" --reason completed --comment "Completed - PR merged to main."
+          echo "Closed issue #$ISSUE_NUMBER for $STORY_ID"
 
       - name: Wait for GitHub API to reflect issue close
         if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
@@ -89,25 +116,37 @@ jobs:
           (github.event_name == 'pull_request' && startsWith(github.event.pull_request.head.ref, 'feature/'))
         env:
           GH_TOKEN: ${{ secrets.QUEUE_MANAGER_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.story_id }}" ]; then
             NEXT_STORY="${{ github.event.inputs.story_id }}"
-            echo "Manual override — using story: $NEXT_STORY"
+            echo "Manual override - using story: $NEXT_STORY"
             echo "next_story=$NEXT_STORY" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          chmod +x scripts/next-story.sh
-          NEXT_STORY=$(./scripts/next-story.sh)
-          EXIT_CODE=$?
+          chmod +x scripts/next-story.sh scripts/check-prerequisites.sh
+
+          # Actions runs this step with bash -e, so capture the exit code
+          # explicitly; a bare assignment would abort the step on any
+          # non-zero exit before the code could be inspected.
+          NEXT_STORY=$(./scripts/next-story.sh) && EXIT_CODE=0 || EXIT_CODE=$?
+
+          if [ $EXIT_CODE -eq 3 ]; then
+            # Normal when a spec lands on main while a story is being worked.
+            # The queue picks up again when that story's PR merges.
+            echo "::notice::A story is already in-progress - nothing to start."
+            echo "next_story=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
           if [ $EXIT_CODE -ne 0 ]; then
-            echo "Queue manager error — a story may already be in-progress."
+            echo "::error::Queue manager failed (exit $EXIT_CODE) - see log above."
             exit 1
           fi
 
           if [ -z "$NEXT_STORY" ]; then
-            echo "No eligible story found in queue — nothing to start."
+            echo "No eligible story found in queue - nothing to start."
             echo "next_story=" >> $GITHUB_OUTPUT
           else
             echo "Next eligible story: $NEXT_STORY"
@@ -118,20 +157,22 @@ jobs:
         if: steps.queue.outputs.next_story != ''
         env:
           GH_TOKEN: ${{ secrets.QUEUE_MANAGER_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           STORY_ID="${{ steps.queue.outputs.next_story }}"
 
           ISSUE_NUMBER=$(gh issue list \
             --label "story" \
             --state open \
+            --limit 500 \
             --json number,title \
-            --jq ".[] | select(.title | test(\"$STORY_ID\")) | .number" 2>/dev/null)
+            | jq -r --arg id "$STORY_ID" '[.[] | select(.title | test("\\b" + $id + "\\b")) | .number][0] // empty')
 
           if [ -n "$ISSUE_NUMBER" ]; then
             gh api \
               --method POST \
-              /repos/birdman74/streamvault/issues/$ISSUE_NUMBER/labels \
-              -f 'labels[]=in-progress'
+              "repos/{owner}/{repo}/issues/$ISSUE_NUMBER/labels" \
+              -f 'labels[]=in-progress' > /dev/null
             echo "Marked issue #$ISSUE_NUMBER as in-progress"
           else
             echo "WARNING: No open issue found for $STORY_ID"
@@ -151,4 +192,4 @@ jobs:
           STORY_FILE: ${{ steps.story_file.outputs.story_file }}
         run: |
           echo "Launching Test persona for $STORY_ID..."
-          /home/brian/bin/streamvault-test-auto.sh "A new user story is ready to begin. Read the story file $STORY_FILE and execute Phase 1 of your workflow: create the feature branch feature/${STORY_ID}-short-kebab-case-description, write the test plan, define API contracts, write failing automated tests, commit all artifacts to the feature branch, and push the branch to origin — per your CLAUDE.md instructions."
+          /home/brian/bin/streamvault-test-auto.sh "A new user story is ready to begin. Read the story file $STORY_FILE and execute Phase 1 of your workflow: create the feature branch feature/${STORY_ID}-short-kebab-case-description, write the test plan, define API contracts, write failing automated tests, commit all artifacts to the feature branch, and push the branch to origin - per your CLAUDE.md instructions."

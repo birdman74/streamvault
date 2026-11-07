@@ -1,7 +1,7 @@
 # ADR-002: Push-Triggered Workflow Guard Pattern
 
 **Date**: 2026-09-23
-**Status**: Accepted
+**Status**: Accepted (amended 2026-11-07)
 **Deciders**: Brian Campbell
 
 ---
@@ -22,7 +22,7 @@ Two of the five workflows that fired had a guard beyond the `paths:`/`branches:`
 
 Every workflow that launches a Dev, Test, or PO persona container in response to a `push` event must verify two things inside the job itself, and must not treat the `on: push: paths:` filter as sufficient on its own:
 
-1. **Commit authorship.** Confirm via `git log -1 --format='%an'` (or, where the precise file list of the triggering commit matters, `git diff-tree --no-commit-id --name-only -r <sha>`) that the action causing this push is actually attributable to the persona or actor whose work this workflow exists to react to. `github.actor` at the job `if:` level identifies who pushed, not what was actually pushed or by which persona's commit; it is not a substitute for this check.
+1. **Commit authorship.** Confirm via `git log -1 --format='%an'` (or, where the precise file list of the triggering commit matters, `git diff --name-only <sha>^1 <sha>`; see Amendment 2026-11-07 for why `git diff-tree` must not be used) that the action causing this push is actually attributable to the persona or actor whose work this workflow exists to react to. `github.actor` at the job `if:` level identifies who pushed, not what was actually pushed or by which persona's commit; it is not a substitute for this check.
 2. **Current state.** Confirm the condition the workflow exists to react to is not already satisfied before launching a container: the expected downstream artifact does not already exist, no PR already covers the state in question, no issue label already reflects it, etc.
 
 `paths:` and `branches:` filters on the `on:` trigger remain in place as a cheap pre-filter to avoid invoking the job at all on obviously unrelated pushes, but they are never trusted as the sole gate for whether to launch a persona or perform a mutating action.
@@ -32,11 +32,30 @@ Every workflow that launches a Dev, Test, or PO persona container in response to
 ## Consequences
 
 - `trigger-dev-review.yml`, `trigger-dev-implement.yml`, and `trigger-test-revision.yml` were updated to add commit-author checks and a state check (does the expected downstream file already exist), matching the pattern below.
-- `trigger-test-next-story.yml` was updated to add an explicit `git diff-tree` check confirming the triggering commit itself touched a `docs/specs/story-*.md` file, rather than trusting the `paths:` filter match.
+- `trigger-test-next-story.yml` was updated to add an explicit file check confirming the triggering commit itself touched a `docs/specs/story-*.md` file, rather than trusting the `paths:` filter match. (Originally `git diff-tree`; replaced by a first-parent diff per Amendment 2026-11-07.)
 - `trigger-test-on-dev-fix.yml` and `trigger-dev-on-test-commit.yml` already followed this pattern before the incident and required no changes; they are the reference implementation and are annotated as such.
 - Any new push-triggered workflow that launches a persona container, or performs any other mutating GitHub action (label change, issue close, PR review), must include both checks before merge. This applies regardless of whether the `paths:` filter looks precise, since the filter's unreliability is on the GitHub side, not a matter of writing a tighter glob.
 - A force-push or interactive rebase on a feature branch, or a force-push to `main`, is now expected to be a no-op across every trigger workflow in this repository, not just the ones that happened to already be guarded.
 - `CONTRIBUTING.md` and this ADR should be consulted before adding any new workflow that reacts to a `push` event.
+
+---
+
+## Amendment 2026-11-07: file checks must use a first-parent diff
+
+**Problem.** The file check originally prescribed here, `git diff-tree --no-commit-id --name-only -r <sha>`, lists no files at all when `<sha>` is a merge commit (without `-m`, `diff-tree` does not diff a merge against its parents). Most PRs into `main` are merged with a merge commit, so any story spec change that reached `main` through a PR was silently treated as "no story spec files changed" and skipped.
+
+**Decision.** Where the file list of the triggering commit matters, use a first-parent diff:
+
+```bash
+git diff --name-only <sha>^1 <sha>
+```
+
+This lists exactly the files the commit brought into the branch for regular, squash and merge commits alike, and still requires `fetch-depth: 2` on checkout. It keeps the original protection: after a force-push that only reorders commits, it reports only the top commit's own changes, not the rewritten range that GitHub's `paths:` filter may have matched.
+
+**Consequences.**
+
+- `trigger-test-next-story.yml` now uses the first-parent diff.
+- Label reconciliation for story spec changes runs as a step inside `trigger-test-next-story.yml`, behind its existing guards, rather than in a separate push-triggered workflow. `sync-blocked-labels.yml` is triggered only by issue events and manual dispatch, so this ADR does not apply to it.
 
 ---
 

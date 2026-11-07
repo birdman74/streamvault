@@ -2,85 +2,98 @@
 # scripts/next-story.sh
 #
 # Determines the next eligible story to start by querying GitHub Issues.
-# State is inferred from GitHub Issues — no state files needed.
+# State is inferred from GitHub Issues - no state files needed.
 #
 # A story is eligible when:
 # 1. Its GitHub Issue is open and labeled 'story'
 # 2. No other story issue is currently labeled 'in-progress'
-# 3. All prerequisite stories (listed in the spec file ## Prerequisites section)
-#    have their GitHub Issues closed
+# 3. All prerequisite stories have their GitHub Issues closed as completed
+#    (rule lives in scripts/check-prerequisites.sh, shared with
+#    scripts/sync-blocked-labels.sh)
+#
+# Fails closed: if any GitHub API call fails, the script exits 1 rather
+# than guessing, so a transient error can never start a second story or
+# silently report an empty queue.
 #
 # Usage: ./scripts/next-story.sh
 # Output: story ID (e.g. "story-005") to stdout, or empty string if nothing eligible
-# Exit code 1: a story is already in-progress (error condition)
-# Exit code 0: success
+# Exit code 0: success (story ID or empty string on stdout)
+# Exit code 1: error (an API call failed)
+# Exit code 3: a story is already in-progress, so nothing can start
 
-SPECS_DIR="docs/specs"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CHECK_PREREQS="$SCRIPT_DIR/check-prerequisites.sh"
+
+# Must match COMPLETED_FILTER in check-prerequisites.sh
+COMPLETED_FILTER='[.[] | select(.stateReason == "COMPLETED" or .stateReason == null or .stateReason == "") | .title]'
 
 # Check for any story already in-progress
 IN_PROGRESS=$(gh issue list \
   --label "story,in-progress" \
   --state open \
+  --limit 500 \
   --json number,title \
-  --jq '.[0].title' 2>/dev/null)
+  --jq '.[0].title // ""')
+if [ $? -ne 0 ]; then
+  echo "ERROR: Could not check for in-progress stories" >&2
+  exit 1
+fi
 
 if [ -n "$IN_PROGRESS" ]; then
-  echo "ERROR: A story is already in-progress: $IN_PROGRESS. Complete it before starting a new story." >&2
-  exit 1
+  echo "A story is already in-progress: $IN_PROGRESS. Nothing can start until it completes." >&2
+  exit 3
 fi
 
 # Get all open story issues sorted by issue number (proxy for story number)
 OPEN_STORIES=$(gh issue list \
   --label "story" \
   --state open \
-  --json number,title,labels \
-  --jq '[.[] | select(.labels[].name == "story")] | sort_by(.number)' 2>/dev/null)
+  --limit 500 \
+  --json number,title \
+  --jq 'sort_by(.number)')
+if [ $? -ne 0 ] || [ -z "$OPEN_STORIES" ]; then
+  echo "ERROR: Could not fetch open story issues" >&2
+  exit 1
+fi
 
-if [ -z "$OPEN_STORIES" ] || [ "$OPEN_STORIES" == "[]" ]; then
+if [ "$OPEN_STORIES" == "[]" ]; then
   echo ""
   exit 0
 fi
 
-# Get all closed story issue titles (completed stories) for prerequisite checking
-CLOSED_STORIES=$(gh issue list \
+# Fetch completed story titles once and share them with check-prerequisites.sh
+COMPLETED_STORIES=$(gh issue list \
   --label "story" \
   --state closed \
-  --json title \
-  --jq '[.[].title]' 2>/dev/null)
+  --limit 500 \
+  --json title,stateReason \
+  --jq "$COMPLETED_FILTER")
+if [ $? -ne 0 ] || [ -z "$COMPLETED_STORIES" ]; then
+  echo "ERROR: Could not fetch completed story issues" >&2
+  exit 1
+fi
+export COMPLETED_STORIES
 
 # Iterate open stories in order and find the first eligible one
 STORY_COUNT=$(echo "$OPEN_STORIES" | jq length)
 
 for i in $(seq 0 $((STORY_COUNT - 1))); do
   ISSUE_TITLE=$(echo "$OPEN_STORIES" | jq -r ".[$i].title")
-  STORY_ID=$(echo "$ISSUE_TITLE" | grep -oP 'story-\d+')
+  STORY_ID=$(echo "$ISSUE_TITLE" | grep -oP 'story-\d+' | head -1)
 
   if [ -z "$STORY_ID" ]; then
     continue
   fi
 
-  # Find the spec file for this story
-  SPEC_FILE=$(ls "$SPECS_DIR"/${STORY_ID}-*.md 2>/dev/null | head -1)
+  "$CHECK_PREREQS" "$STORY_ID" > /dev/null
+  CHECK_RESULT=$?
 
-  if [ -z "$SPEC_FILE" ]; then
-    echo "WARNING: No spec file found for $STORY_ID — skipping." >&2
+  if [ $CHECK_RESULT -eq 2 ]; then
+    echo "WARNING: Could not check prerequisites for $STORY_ID - skipping." >&2
     continue
   fi
 
-  # Read prerequisites from spec file
-  PREREQS=$(awk '/^## Prerequisites/{found=1; next} found && /^##/{exit} found{print}' "$SPEC_FILE" | grep -oP 'story-\d+')
-
-  PREREQS_MET=true
-  for PREREQ in $PREREQS; do
-    # Check if prerequisite story's issue is closed
-    PREREQ_CLOSED=$(echo "$CLOSED_STORIES" | jq -r ".[] | select(test(\"$PREREQ\"))" 2>/dev/null)
-    if [ -z "$PREREQ_CLOSED" ]; then
-      PREREQS_MET=false
-      break
-    fi
-  done
-
-  if [ "$PREREQS_MET" == "true" ]; then
+  if [ $CHECK_RESULT -eq 0 ]; then
     echo "$STORY_ID"
     exit 0
   fi

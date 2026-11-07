@@ -1,5 +1,5 @@
 # Guard pattern: see docs/adr/ADR-002-push-trigger-guard-pattern.md
-name: Trigger Test — Dev Feedback Requires Revision
+name: Trigger Test - Dev Feedback Requires Revision
 
 on:
   push:
@@ -65,7 +65,7 @@ jobs:
             echo "is_dev=true" >> $GITHUB_OUTPUT
           else
             echo "is_dev=false" >> $GITHUB_OUTPUT
-            echo "Commit author is not claude-streamvault-dev — skipping."
+            echo "Commit author is not claude-streamvault-dev - skipping."
           fi
 
       - name: Check revision not already handled
@@ -76,12 +76,34 @@ jobs:
           ROUND="${{ steps.context.outputs.round }}"
           if [ -f "docs/specs/design/${STORY_ID}-test-revision-r${ROUND}.md" ]; then
             echo "needs_revision=false" >> $GITHUB_OUTPUT
-            echo "Revision r${ROUND} already committed — skipping."
+            echo "Revision r${ROUND} already committed - skipping."
           else
             echo "needs_revision=true" >> $GITHUB_OUTPUT
           fi
 
+      - name: Record state before launch
+        id: pre
+        if: |
+          steps.author_check.outputs.is_dev == 'true' &&
+          (github.event_name == 'workflow_dispatch' || steps.state_check.outputs.needs_revision == 'true')
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+        run: |
+          # Backdated 60s so runner/GitHub clock skew cannot hide activity
+          echo "started_at=$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+          chmod +x scripts/persona-outcome-check.sh
+          HEAD_SHA_BEFORE=$(./scripts/persona-outcome-check.sh head-sha "$BRANCH")
+          echo "head_sha=$HEAD_SHA_BEFORE" >> $GITHUB_OUTPUT
+          echo "Head of $BRANCH before launch: $HEAD_SHA_BEFORE"
+
       - name: Launch Test persona for revision
+        id: launch
+        # Step timeout counts as a failure (escalates); the 6h job timeout is a
+        # cancellation, which would skip escalation entirely.
+        timeout-minutes: 180
         if: |
           steps.author_check.outputs.is_dev == 'true' &&
           (github.event_name == 'workflow_dispatch' || steps.state_check.outputs.needs_revision == 'true')
@@ -90,4 +112,49 @@ jobs:
           REVISION_ROUND: ${{ steps.context.outputs.round }}
           FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
         run: |
-          /home/brian/bin/streamvault-test-auto.sh "Dev has committed feedback file docs/specs/design/$STORY_ID-dev-feedback-r${REVISION_ROUND}.md on branch $FEATURE_BRANCH. Read Dev's concerns carefully and execute your revision phase per your CLAUDE.md: revise the test plan and contracts where Dev's feedback is technically valid without dropping AC coverage, then commit $STORY_ID-test-revision-r${REVISION_ROUND}.md and push to origin/$FEATURE_BRANCH."
+          /home/brian/bin/streamvault-test-auto.sh "Dev has committed feedback file docs/specs/design/$STORY_ID-dev-feedback-r${REVISION_ROUND}.md on branch $FEATURE_BRANCH. Read Dev's concerns carefully and execute your revision phase per your CLAUDE.md: revise the test plan and contracts where Dev's feedback is technically valid without dropping AC coverage. Then reconcile your test code: every contract change in this round (constructors, method signatures, endpoints, DTOs, status codes, error shapes) must be applied to every existing test that uses it, in the same commit. Search the test sources for each changed name to find them all. Fill in the Test Code Reconciliation table in $STORY_ID-test-revision-r${REVISION_ROUND}.md, then commit the revision file, the updated test plan and contracts, and all changed test files together, and push to origin/$FEATURE_BRANCH." 2>&1 | tee "$RUNNER_TEMP/persona-output.log"
+
+      - name: Verify persona produced the expected outcome
+        id: outcome
+        if: ${{ !cancelled() && (steps.launch.outcome != 'skipped' || steps.pre.outcome == 'failure') }}
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+          STARTED_AT: ${{ steps.pre.outputs.started_at }}
+          HEAD_SHA_BEFORE: ${{ steps.pre.outputs.head_sha }}
+          ROUND: ${{ steps.context.outputs.round }}
+          LAUNCH_OUTCOME: ${{ steps.launch.outcome }}
+        run: |
+          chmod +x scripts/persona-outcome-check.sh
+          # Retry: GitHub can take a moment to reflect the persona's final push
+          for i in 1 2 3; do
+            sleep 20
+            CHECK_RESULT=$( { ./scripts/persona-outcome-check.sh branch-advanced "$BRANCH" "$HEAD_SHA_BEFORE" claude-streamvault-test && ./scripts/persona-outcome-check.sh file-on-branch "$BRANCH" "docs/specs/design/${STORY_ID}-test-revision-r${ROUND}.md"; } 2>&1 ) && CHECK_CODE=0 || CHECK_CODE=$?
+            [ $CHECK_CODE -eq 0 ] && break
+            echo "Check attempt $i: $CHECK_RESULT"
+          done
+          echo "$CHECK_RESULT"
+          REASON=$(echo "$CHECK_RESULT" | tr '\n' ' ')
+          if [ "$LAUNCH_OUTCOME" != "success" ]; then
+            REASON="Persona was not launched, its launcher failed, or it timed out (launch step: ${LAUNCH_OUTCOME:-not run}). If it timed out, its container may still be running: check docker ps on BRIAN-2025. Outcome check: $REASON"
+            CHECK_CODE=1
+          fi
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
+          exit $CHECK_CODE
+
+      - name: Escalate to Brian
+        if: ${{ !cancelled() && steps.outcome.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+          STAGE: Test design revision stalled
+          REASON: ${{ steps.outcome.outputs.reason }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUTPUT_FILE: ${{ runner.temp }}/persona-output.log
+        run: |
+          chmod +x scripts/escalate-to-brian.sh
+          ./scripts/escalate-to-brian.sh

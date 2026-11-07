@@ -1,0 +1,62 @@
+# Keeps the 'blocked' label on open story issues in sync with spec
+# prerequisites. Fires on the issue events that can change blocked status:
+#   - a story issue is opened, or gets the 'story' label (new story)
+#   - a story issue closes or reopens (e.g. post-merge close by
+#     trigger-test-next-story.yml, a manual close, or a "not planned" close)
+#   - manual dispatch (repair or audit, with optional dry run)
+#
+# Story spec changes pushed to main are handled by
+# trigger-test-next-story.yml, which already carries the ADR-002 push
+# guards and runs scripts/sync-blocked-labels.sh as a step. This workflow
+# has no push trigger, so ADR-002 does not apply to it.
+#
+# Runs on a GitHub-hosted runner: it only needs checkout, gh and jq, and
+# must never wait in line behind a persona run on the self-hosted runner.
+name: Sync Blocked Labels
+
+on:
+  issues:
+    types: [opened, labeled, closed, reopened]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run: report label changes only, apply nothing'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: sync-blocked-labels
+  cancel-in-progress: false
+
+jobs:
+  sync-blocked-labels:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    # 'labeled' fires for every label change (including this workflow's own
+    # 'blocked' edits), so only react when the label added is 'story'.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' &&
+        contains(github.event.issue.labels.*.name, 'story') &&
+        (github.event.action != 'labeled' || github.event.label.name == 'story'))
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Wait for GitHub API to reflect the issue change
+        if: github.event_name == 'issues'
+        run: sleep 30
+
+      - name: Reconcile blocked labels
+        env:
+          GH_TOKEN: ${{ secrets.QUEUE_MANAGER_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
+        run: |
+          chmod +x scripts/check-prerequisites.sh scripts/sync-blocked-labels.sh
+          ./scripts/sync-blocked-labels.sh

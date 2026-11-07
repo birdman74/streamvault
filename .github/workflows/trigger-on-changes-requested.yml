@@ -1,4 +1,4 @@
-name: Trigger Persona — PR Changes Requested
+name: Trigger Persona - PR Changes Requested
 
 on:
   pull_request_review:
@@ -54,17 +54,86 @@ jobs:
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
           echo "Changes Requested by $REVIEWER on $STORY_ID PR #$PR_NUMBER"
 
+      - name: Record state before launch
+        id: pre
+        if: steps.context.outputs.reviewer == 'birdman74'
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+        run: |
+          # Backdated 60s so runner/GitHub clock skew cannot hide activity
+          echo "started_at=$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+          chmod +x scripts/persona-outcome-check.sh
+          HEAD_SHA_BEFORE=$(./scripts/persona-outcome-check.sh head-sha "$BRANCH")
+          echo "head_sha=$HEAD_SHA_BEFORE" >> $GITHUB_OUTPUT
+          echo "Head of $BRANCH before launch: $HEAD_SHA_BEFORE"
+
       - name: Trigger Test (Brian requested changes)
+        id: launch
+        # Step timeout counts as a failure (escalates); the 6h job timeout is a
+        # cancellation, which would skip escalation entirely.
+        timeout-minutes: 180
         if: steps.context.outputs.reviewer == 'birdman74'
         env:
           STORY_ID: ${{ steps.context.outputs.story_id }}
           FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
           PR_NUMBER: ${{ steps.context.outputs.pr_number }}
         run: |
-          echo "Brian requested changes — waking Test for Phase 4..."
-          /home/brian/bin/streamvault-test-auto.sh "Brian has posted a Changes Requested review on PR #$PR_NUMBER for $STORY_ID on branch $FEATURE_BRANCH. Read Brian's review comments on the PR carefully. Execute Phase 4 of your workflow per your CLAUDE.md: write new failing tests that explicitly cover the gap Brian identified, commit them to the feature branch, and push to origin/$FEATURE_BRANCH. Do NOT attempt to submit a gh pr review — posting a commit with new failing tests is sufficient to trigger Dev automatically."
+          echo "Brian requested changes - waking Test for Phase 4..."
+          /home/brian/bin/streamvault-test-auto.sh "Brian has posted a Changes Requested review on PR #$PR_NUMBER for $STORY_ID on branch $FEATURE_BRANCH. Read Brian's review comments on the PR carefully. Execute Phase 4 of your workflow per your CLAUDE.md: write new failing tests that explicitly cover each gap Brian identified, run mvn clean verify to confirm they fail for the right reason, commit them, and push to origin/$FEATURE_BRANCH. Then, as your final action, post a Test Run Summary as a PR comment (gh pr comment $PR_NUMBER --body-file <file>) whose first line is exactly <!-- test-verdict: CHANGES_REQUESTED -->, listing each of Brian's points and the failing test that covers it. That comment is what wakes Dev. Do not run gh pr review." 2>&1 | tee "$RUNNER_TEMP/persona-output.log"
 
-      - name: Skip — bot reviewer handled by push trigger
-        if: steps.context.outputs.reviewer == 'briankcampbell-streamvault-bot'
+      - name: Verify persona produced the expected outcome
+        id: outcome
+        if: ${{ !cancelled() && (steps.launch.outcome != 'skipped' || steps.pre.outcome == 'failure') }}
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+          STARTED_AT: ${{ steps.pre.outputs.started_at }}
+          HEAD_SHA_BEFORE: ${{ steps.pre.outputs.head_sha }}
+          LAUNCH_OUTCOME: ${{ steps.launch.outcome }}
         run: |
-          echo "Bot reviewer detected — Dev will be triggered by the test commit push, not this workflow. No action needed here."
+          chmod +x scripts/persona-outcome-check.sh
+          # Retry: GitHub can take a moment to reflect the persona's final push
+          for i in 1 2 3; do
+            sleep 20
+            CHECK_RESULT=$( { ./scripts/persona-outcome-check.sh branch-advanced "$BRANCH" "$HEAD_SHA_BEFORE" claude-streamvault-test && ./scripts/persona-outcome-check.sh verdict-since "$PR_NUMBER" "$STARTED_AT" briankcampbell-streamvault-bot CHANGES_REQUESTED; } 2>&1 ) && CHECK_CODE=0 || CHECK_CODE=$?
+            [ $CHECK_CODE -eq 0 ] && break
+            echo "Check attempt $i: $CHECK_RESULT"
+          done
+          echo "$CHECK_RESULT"
+          REASON=$(echo "$CHECK_RESULT" | tr '\n' ' ')
+          if [ "$LAUNCH_OUTCOME" != "success" ]; then
+            REASON="Persona was not launched, its launcher failed, or it timed out (launch step: ${LAUNCH_OUTCOME:-not run}). If it timed out, its container may still be running: check docker ps on BRIAN-2025. Outcome check: $REASON"
+            CHECK_CODE=1
+          fi
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
+          exit $CHECK_CODE
+
+      - name: Escalate to Brian
+        if: ${{ !cancelled() && steps.outcome.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+          STAGE: Test failing tests for review gap stalled
+          REASON: ${{ steps.outcome.outputs.reason }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUTPUT_FILE: ${{ runner.temp }}/persona-output.log
+        run: |
+          chmod +x scripts/escalate-to-brian.sh
+          ./scripts/escalate-to-brian.sh
+
+      - name: Skip - not a review by Brian
+        if: steps.context.outputs.reviewer != 'birdman74'
+        env:
+          REVIEWER: ${{ steps.context.outputs.reviewer }}
+        run: |
+          echo "Changes Requested review by $REVIEWER, not birdman74 - no action. (Test's own verdicts are PR comments handled by trigger-dev-on-test-verdict.yml; the bot cannot review its own PR.)"

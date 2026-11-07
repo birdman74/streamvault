@@ -1,4 +1,4 @@
-name: Trigger PO — Brian Requested Changes on Specs PR
+name: Trigger PO - Brian Requested Changes on Specs PR
 
 on:
   pull_request_review:
@@ -46,10 +46,76 @@ jobs:
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
           echo "Changes requested on specs PR #$PR_NUMBER on branch $BRANCH"
 
+      - name: Record state before launch
+        id: pre
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: specs PR #${{ steps.context.outputs.pr_number }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+        run: |
+          # Backdated 60s so runner/GitHub clock skew cannot hide activity
+          echo "started_at=$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+          chmod +x scripts/persona-outcome-check.sh
+          HEAD_SHA_BEFORE=$(./scripts/persona-outcome-check.sh head-sha "$BRANCH")
+          echo "head_sha=$HEAD_SHA_BEFORE" >> $GITHUB_OUTPUT
+          echo "Head of $BRANCH before launch: $HEAD_SHA_BEFORE"
+
       - name: Launch PO persona to address review
+        id: launch
+        # Step timeout counts as a failure (escalates); the 6h job timeout is a
+        # cancellation, which would skip escalation entirely.
+        timeout-minutes: 180
         env:
           SPECS_BRANCH: ${{ steps.context.outputs.branch }}
           PR_NUMBER: ${{ steps.context.outputs.pr_number }}
         run: |
           echo "Waking PO to address Brian's review on PR #$PR_NUMBER..."
-          /home/brian/bin/streamvault-po-auto.sh "Brian has posted a Changes Requested review on specs PR #$PR_NUMBER on branch $SPECS_BRANCH. Read Brian's review comments carefully. Update the affected spec files on the same branch to address his feedback. Update any GitHub Issues whose story scope changed. Commit and push to origin/$SPECS_BRANCH. Do not open a new PR -- the existing one updates automatically."
+          /home/brian/bin/streamvault-po-auto.sh "Brian has posted a Changes Requested review on specs PR #$PR_NUMBER on branch $SPECS_BRANCH. Read Brian's review comments carefully. Update the affected spec files on the same branch to address his feedback. Update any GitHub Issues whose story scope changed. Commit and push to origin/$SPECS_BRANCH. Do not open a new PR -- the existing one updates automatically." 2>&1 | tee "$RUNNER_TEMP/persona-output.log"
+
+      - name: Verify persona produced the expected outcome
+        id: outcome
+        if: ${{ !cancelled() && (steps.launch.outcome != 'skipped' || steps.pre.outcome == 'failure') }}
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: specs PR #${{ steps.context.outputs.pr_number }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+          STARTED_AT: ${{ steps.pre.outputs.started_at }}
+          HEAD_SHA_BEFORE: ${{ steps.pre.outputs.head_sha }}
+          LAUNCH_OUTCOME: ${{ steps.launch.outcome }}
+        run: |
+          chmod +x scripts/persona-outcome-check.sh
+          # Retry: GitHub can take a moment to reflect the persona's final push
+          for i in 1 2 3; do
+            sleep 20
+            CHECK_RESULT=$( { ./scripts/persona-outcome-check.sh branch-advanced "$BRANCH" "$HEAD_SHA_BEFORE" claude-streamvault-po; } 2>&1 ) && CHECK_CODE=0 || CHECK_CODE=$?
+            [ $CHECK_CODE -eq 0 ] && break
+            echo "Check attempt $i: $CHECK_RESULT"
+          done
+          echo "$CHECK_RESULT"
+          REASON=$(echo "$CHECK_RESULT" | tr '\n' ' ')
+          if [ "$LAUNCH_OUTCOME" != "success" ]; then
+            REASON="Persona was not launched, its launcher failed, or it timed out (launch step: ${LAUNCH_OUTCOME:-not run}). If it timed out, its container may still be running: check docker ps on BRIAN-2025. Outcome check: $REASON"
+            CHECK_CODE=1
+          fi
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
+          exit $CHECK_CODE
+
+      - name: Escalate to Brian
+        if: ${{ !cancelled() && steps.outcome.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: specs PR #${{ steps.context.outputs.pr_number }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+          STAGE: PO spec revision stalled
+          REASON: ${{ steps.outcome.outputs.reason }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUTPUT_FILE: ${{ runner.temp }}/persona-output.log
+        run: |
+          chmod +x scripts/escalate-to-brian.sh
+          ./scripts/escalate-to-brian.sh

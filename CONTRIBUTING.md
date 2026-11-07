@@ -27,7 +27,8 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - Bot account (`briankcampbell-streamvault-bot`) opens all feature PRs
 - Brian (`birdman74`) is CODEOWNER -- his approval is required before any merge
 - CI must pass before merge
-- Test persona must post a test run summary as a PR comment before Brian reviews
+- Test persona must post a test run summary as a PR comment before Brian reviews. Its first line is the verdict marker (`<!-- test-verdict: APPROVED -->` or `<!-- test-verdict: CHANGES_REQUESTED -->`); a `CHANGES_REQUESTED` verdict wakes Dev automatically (ADR-004)
+- Brian reviews only after Test's latest verdict is `APPROVED`. Step-by-step instructions for both outcomes (Approve and merge, or Request changes) are in the [PR Review Guide](https://github.com/birdman74/ai-dev-toolkit/blob/main/docs/agentic-workflow-diagram.md#brians-pr-review-guide)
 
 ### STATUS.md
 Every meaningful commit must include a STATUS.md update in the same commit:
@@ -119,6 +120,8 @@ docs/adr/
 Existing ADRs:
 - [ADR-001](docs/adr/ADR-001-spring-mvc-test-auth-pattern.md) -- Spring MVC controller test authentication pattern
 - [ADR-002](docs/adr/ADR-002-push-trigger-guard-pattern.md) -- Push-triggered workflow guard pattern (commit-author and state checks required before launching a persona container)
+- [ADR-003](docs/adr/ADR-003-persona-outcome-verification.md) -- Persona outcome verification (every persona launch verifies its expected result and escalates to Brian when it is missing)
+- [ADR-004](docs/adr/ADR-004-test-verdict-comment-triggers-dev.md) -- Test verdict comment is the only trigger for Dev fixes (`<!-- test-verdict: ... -->` marker; fix rounds capped at 3 per Brian review)
 
 If your decision is not covered by an existing ADR, flag it to Brian. New ADRs are created when a decision has significant long-term consequences and alternatives were considered.
 

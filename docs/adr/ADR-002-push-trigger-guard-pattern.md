@@ -8,7 +8,7 @@
 
 ## Context
 
-While reviewing STORY-007, Brian made a single commit to `STATUS.md` and separately performed an interactive rebase (reordering commits already on the branch, no code content changed) followed by a force-push. That force-push alone fired five workflows against the same commit SHA: `StreamVault CI`, `CodeQL`, `Trigger Test — Dev Pushed Fix to Open PR`, `Trigger Dev — Test Plan Ready for Review`, and `Trigger Dev — Agreed Design, Begin Implementation`.
+While reviewing STORY-007, Brian made a single commit to `STATUS.md` and separately performed an interactive rebase (reordering commits already on the branch, no code content changed) followed by a force-push. That force-push alone fired five workflows against the same commit SHA: `StreamVault CI`, `CodeQL`, `Trigger Test - Dev Pushed Fix to Open PR`, `Trigger Dev - Test Plan Ready for Review`, and `Trigger Dev - Agreed Design, Begin Implementation`.
 
 The root cause: GitHub's `push` event `paths:` filter is unreliable across a force-push or history rewrite. It is intended to compare the files changed by the pushed commit(s) against the filter's glob patterns, but for a force-push the underlying diff calculation can span the entire rewritten commit range rather than just the resulting top commit. A push that only reorders existing commits, touching no file content at the final tree, can still cause a `paths:` filter to match files that appear anywhere in that range.
 
@@ -33,7 +33,7 @@ Every workflow that launches a Dev, Test, or PO persona container in response to
 
 - `trigger-dev-review.yml`, `trigger-dev-implement.yml`, and `trigger-test-revision.yml` were updated to add commit-author checks and a state check (does the expected downstream file already exist), matching the pattern below.
 - `trigger-test-next-story.yml` was updated to add an explicit file check confirming the triggering commit itself touched a `docs/specs/story-*.md` file, rather than trusting the `paths:` filter match. (Originally `git diff-tree`; replaced by a first-parent diff per Amendment 2026-11-07.)
-- `trigger-test-on-dev-fix.yml` and `trigger-dev-on-test-commit.yml` already followed this pattern before the incident and required no changes; they are the reference implementation and are annotated as such.
+- `trigger-test-on-dev-fix.yml` and `trigger-dev-on-test-commit.yml` already followed this pattern before the incident and required no changes; they are the reference implementation and are annotated as such. (`trigger-dev-on-test-commit.yml` was later replaced by the comment-triggered `trigger-dev-on-test-verdict.yml`; see ADR-004. `trigger-test-on-dev-fix.yml` remains the push-triggered reference.)
 - Any new push-triggered workflow that launches a persona container, or performs any other mutating GitHub action (label change, issue close, PR review), must include both checks before merge. This applies regardless of whether the `paths:` filter looks precise, since the filter's unreliability is on the GitHub side, not a matter of writing a tighter glob.
 - A force-push or interactive rebase on a feature branch, or a force-push to `main`, is now expected to be a no-op across every trigger workflow in this repository, not just the ones that happened to already be guarded.
 - `CONTRIBUTING.md` and this ADR should be consulted before adding any new workflow that reacts to a `push` event.

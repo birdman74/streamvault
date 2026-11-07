@@ -1,0 +1,181 @@
+# Wakes Dev when Test posts a CHANGES_REQUESTED verdict on a feature PR.
+# See docs/adr/ADR-004-test-verdict-comment-triggers-dev.md
+#
+# This is the ONLY automated path that wakes Dev to fix an open PR. It
+# replaces trigger-dev-on-test-commit.yml, which keyed off Test's pushes plus
+# a formal changes_requested review. That could not work for Test's own
+# verdicts: Dev and Test share the bot account that opened the PR, and GitHub
+# does not let a PR author review their own PR.
+#
+# Test's verdict comment is posted as Test's LAST action, after any new
+# failing tests are pushed, so Dev never wakes before the tests are on the
+# branch. Both of Test's verdict sources use it:
+#   - Phase 3 final review / re-verification (Test found problems)
+#   - Phase 4 after Brian's Changes Requested review
+#
+# issue_comment workflows always run from the default branch, so this
+# applies to every open PR as soon as it is on main.
+name: Trigger Dev - Test Verdict Requested Changes
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull request number'
+        required: true
+
+concurrency:
+  group: dev-on-test-verdict-${{ github.event.issue.number || github.event.inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  trigger-dev-on-test-verdict:
+    permissions:
+      contents: read
+    runs-on: self-hosted
+    # Only a bot comment on a PR that carries the CHANGES_REQUESTED marker.
+    # Dev also posts as the bot but never writes the verdict marker.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.issue.pull_request &&
+        github.event.comment.user.login == 'briankcampbell-streamvault-bot' &&
+        contains(github.event.comment.body, '<!-- test-verdict: CHANGES_REQUESTED -->')
+      )
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Identify PR, branch and story
+        id: context
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.inputs.pr_number }}
+        run: |
+          PR_INFO=$(gh pr view "$PR_NUMBER" --json headRefName,state --jq '.headRefName + " " + .state')
+          BRANCH="${PR_INFO% *}"
+          PR_STATE="${PR_INFO##* }"
+          STORY_ID=$(echo "$BRANCH" | grep -oP 'story-\d+' | head -1 || true)
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "story_id=$STORY_ID" >> $GITHUB_OUTPUT
+          if [ "$PR_STATE" != "OPEN" ] || [[ "$BRANCH" != feature/* ]] || [ -z "$STORY_ID" ]; then
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "PR #$PR_NUMBER is $PR_STATE on '$BRANCH' - not an open feature PR, skipping."
+          else
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "Test requested changes on PR #$PR_NUMBER ($STORY_ID, $BRANCH)"
+          fi
+
+      - name: Check Dev fix round limit
+        id: limit_check
+        if: steps.context.outputs.should_run == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+        run: |
+          # The cap stops Test and Dev from cycling on their own. It resets
+          # every time Brian submits a review, so Brian's own Changes Requested
+          # round never escalates straight back to him.
+          LAST_BRIAN_REVIEW=$(gh api --paginate "repos/$GH_REPO/pulls/$PR_NUMBER/reviews" \
+            --jq '.[] | select(.user.login == "birdman74") | .submitted_at' | tail -1)
+          chmod +x scripts/persona-outcome-check.sh
+          ROUNDS=$(./scripts/persona-outcome-check.sh verdict-count "$PR_NUMBER" "$LAST_BRIAN_REVIEW" briankcampbell-streamvault-bot CHANGES_REQUESTED)
+          echo "CHANGES_REQUESTED verdicts since Brian's last review (${LAST_BRIAN_REVIEW:-none}): $ROUNDS"
+          if [ "$ROUNDS" -gt 3 ]; then
+            echo "limit_reached=true" >> $GITHUB_OUTPUT
+          else
+            echo "limit_reached=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Escalate to Brian if fix round limit reached
+        if: steps.limit_check.outputs.limit_reached == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+          STAGE: Dev fix round limit reached
+          REASON: "Test has requested changes more than 3 times since Brian's last review without reaching APPROVED. Read Test's latest verdict comment on the PR. To continue, submit a review on the PR (this resets the count) or run this workflow manually."
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          chmod +x scripts/escalate-to-brian.sh
+          ./scripts/escalate-to-brian.sh
+          # Red run: the pipeline is stopped until Brian acts
+          exit 1
+
+      - name: Record state before launch
+        id: pre
+        if: steps.context.outputs.should_run == 'true' && steps.limit_check.outputs.limit_reached == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+        run: |
+          echo "started_at=$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+          chmod +x scripts/persona-outcome-check.sh
+          HEAD_SHA_BEFORE=$(./scripts/persona-outcome-check.sh head-sha "$BRANCH")
+          echo "head_sha=$HEAD_SHA_BEFORE" >> $GITHUB_OUTPUT
+          echo "Head of $BRANCH before launch: $HEAD_SHA_BEFORE"
+
+      - name: Launch Dev persona to fix implementation
+        id: launch
+        # Step timeout counts as a failure (escalates); the 6h job timeout is a
+        # cancellation, which would skip escalation entirely.
+        timeout-minutes: 180
+        if: steps.context.outputs.should_run == 'true' && steps.limit_check.outputs.limit_reached == 'false'
+        env:
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          FEATURE_BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+        run: |
+          /home/brian/bin/streamvault-dev-auto.sh "Test has posted a CHANGES_REQUESTED verdict on PR #$PR_NUMBER for $STORY_ID (branch $FEATURE_BRANCH). Execute Phase 3 of your workflow per your CLAUDE.md: pull the latest branch, read Test's most recent verdict comment on the PR (gh pr view $PR_NUMBER --comments) and any new failing tests, fix the implementation until all tests pass, run mvn clean verify, commit the fix, and push to origin/$FEATURE_BRANCH. Do not open a new PR and do not edit Test's tests. If the verdict requires changing Test's tests or the agreed contract, stop with a NEEDS BRIAN message instead." 2>&1 | tee "$RUNNER_TEMP/persona-output.log"
+
+      - name: Verify persona produced the expected outcome
+        id: outcome
+        if: ${{ !cancelled() && (steps.launch.outcome != 'skipped' || steps.pre.outcome == 'failure') }}
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+          HEAD_SHA_BEFORE: ${{ steps.pre.outputs.head_sha }}
+          LAUNCH_OUTCOME: ${{ steps.launch.outcome }}
+        run: |
+          chmod +x scripts/persona-outcome-check.sh
+          # Retry: GitHub can take a moment to reflect the persona's final push
+          for i in 1 2 3; do
+            sleep 20
+            CHECK_RESULT=$( { ./scripts/persona-outcome-check.sh branch-advanced "$BRANCH" "$HEAD_SHA_BEFORE" claude-streamvault-dev; } 2>&1 ) && CHECK_CODE=0 || CHECK_CODE=$?
+            [ $CHECK_CODE -eq 0 ] && break
+            echo "Check attempt $i: $CHECK_RESULT"
+          done
+          echo "$CHECK_RESULT"
+          REASON=$(echo "$CHECK_RESULT" | tr '\n' ' ')
+          if [ "$LAUNCH_OUTCOME" != "success" ]; then
+            REASON="Persona was not launched, its launcher failed, or it timed out (launch step: ${LAUNCH_OUTCOME:-not run}). If it timed out, its container may still be running: check docker ps on BRIAN-2025. Outcome check: $REASON"
+            CHECK_CODE=1
+          fi
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
+          exit $CHECK_CODE
+
+      - name: Escalate to Brian
+        if: ${{ !cancelled() && steps.outcome.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: ${{ steps.context.outputs.story_id }}
+          BRANCH: ${{ steps.context.outputs.branch }}
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+          STAGE: Dev fix for Test verdict stalled
+          REASON: ${{ steps.outcome.outputs.reason }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUTPUT_FILE: ${{ runner.temp }}/persona-output.log
+        run: |
+          chmod +x scripts/escalate-to-brian.sh
+          ./scripts/escalate-to-brian.sh

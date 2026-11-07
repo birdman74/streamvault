@@ -185,11 +185,78 @@ jobs:
           STORY_FILE=$(ls docs/specs/${{ steps.queue.outputs.next_story }}-*.md 2>/dev/null | head -1)
           echo "story_file=$STORY_FILE" >> $GITHUB_OUTPUT
 
+      - name: Record state before launch
+        id: pre
+        if: steps.queue.outputs.next_story != ''
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: ${{ steps.queue.outputs.next_story }}
+        run: |
+          # Backdated 60s so runner/GitHub clock skew cannot hide activity
+          echo "started_at=$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+          # If the story branch already exists (e.g. a manual restart), the check
+          # must see NEW commits on it, not just that it exists.
+          EXISTING_BRANCH=$(gh api "repos/$GH_REPO/git/matching-refs/heads/feature/${STORY_ID}-" --jq '.[0].ref // ""' | sed 's|^refs/heads/||')
+          echo "existing_branch=$EXISTING_BRANCH" >> $GITHUB_OUTPUT
+          if [ -n "$EXISTING_BRANCH" ]; then
+            chmod +x scripts/persona-outcome-check.sh
+            echo "head_sha=$(./scripts/persona-outcome-check.sh head-sha "$EXISTING_BRANCH")" >> $GITHUB_OUTPUT
+            echo "Branch $EXISTING_BRANCH already exists; Test must push new commits to it"
+          fi
+
       - name: Launch Test persona for next story
+        id: launch
+        # Step timeout counts as a failure (escalates); the 6h job timeout is a
+        # cancellation, which would skip escalation entirely.
+        timeout-minutes: 180
         if: steps.queue.outputs.next_story != ''
         env:
           STORY_ID: ${{ steps.queue.outputs.next_story }}
           STORY_FILE: ${{ steps.story_file.outputs.story_file }}
         run: |
           echo "Launching Test persona for $STORY_ID..."
-          /home/brian/bin/streamvault-test-auto.sh "A new user story is ready to begin. Read the story file $STORY_FILE and execute Phase 1 of your workflow: create the feature branch feature/${STORY_ID}-short-kebab-case-description, write the test plan, define API contracts, write failing automated tests, commit all artifacts to the feature branch, and push the branch to origin - per your CLAUDE.md instructions."
+          /home/brian/bin/streamvault-test-auto.sh "A new user story is ready to begin. Read the story file $STORY_FILE and execute Phase 1 of your workflow: create the feature branch feature/${STORY_ID}-short-kebab-case-description, write the test plan, define API contracts, write failing automated tests, commit all artifacts to the feature branch, and push the branch to origin - per your CLAUDE.md instructions." 2>&1 | tee "$RUNNER_TEMP/persona-output.log"
+
+      - name: Verify persona produced the expected outcome
+        id: outcome
+        if: ${{ !cancelled() && (steps.launch.outcome != 'skipped' || steps.pre.outcome == 'failure') }}
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: ${{ steps.queue.outputs.next_story }}
+          STARTED_AT: ${{ steps.pre.outputs.started_at }}
+          HEAD_SHA_BEFORE: ${{ steps.pre.outputs.head_sha }}
+          EXISTING_BRANCH: ${{ steps.pre.outputs.existing_branch }}
+          LAUNCH_OUTCOME: ${{ steps.launch.outcome }}
+        run: |
+          chmod +x scripts/persona-outcome-check.sh
+          # Retry: GitHub can take a moment to reflect the persona's final push
+          for i in 1 2 3; do
+            sleep 20
+            CHECK_RESULT=$( { if [ -n "$EXISTING_BRANCH" ]; then ./scripts/persona-outcome-check.sh branch-advanced "$EXISTING_BRANCH" "$HEAD_SHA_BEFORE" claude-streamvault-test; else ./scripts/persona-outcome-check.sh branch-created "$STORY_ID"; fi; } 2>&1 ) && CHECK_CODE=0 || CHECK_CODE=$?
+            [ $CHECK_CODE -eq 0 ] && break
+            echo "Check attempt $i: $CHECK_RESULT"
+          done
+          echo "$CHECK_RESULT"
+          REASON=$(echo "$CHECK_RESULT" | tr '\n' ' ')
+          if [ "$LAUNCH_OUTCOME" != "success" ]; then
+            REASON="Persona was not launched, its launcher failed, or it timed out (launch step: ${LAUNCH_OUTCOME:-not run}). If it timed out, its container may still be running: check docker ps on BRIAN-2025. Outcome check: $REASON"
+            CHECK_CODE=1
+          fi
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
+          exit $CHECK_CODE
+
+      - name: Escalate to Brian
+        if: ${{ !cancelled() && steps.outcome.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          STORY_ID: ${{ steps.queue.outputs.next_story }}
+          STAGE: Test story kickoff stalled
+          REASON: ${{ steps.outcome.outputs.reason }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUTPUT_FILE: ${{ runner.temp }}/persona-output.log
+        run: |
+          chmod +x scripts/escalate-to-brian.sh
+          ./scripts/escalate-to-brian.sh

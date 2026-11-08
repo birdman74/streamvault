@@ -6,7 +6,75 @@
 
 Spec: `docs/specs/story-009-view-filter-library.md`
 Branch: `feature/story-009-view-filter-library`
-PR: none yet - blocked, see below
+PR: none yet
+
+---
+
+## Phase 3: fixed the AC-5 test contradiction, full suite green, no PR yet (2026-11-08)
+
+Fixes the self-contradiction Dev's previous entry (below) found between two of Test's own committed
+tests in `LibraryServiceTest.java`. Dev's analysis was correct and is not revisited here: the
+contract's algorithm step 5 says skip the series repository entirely for a MOVIE-only type filter,
+`should_notQueryTheSeriesRepositoryAtAll_when_typeFilterIsMovieOnly` pins exactly that, and
+`should_applyTypeAndStatusFiltersTogetherAsAnAndCondition_when_bothAreRequested` stubbed
+`librarySeriesRepository.findByUserId` for the identical MOVIE-only filter shape, so Mockito's
+default strict stubbing failed that stub as unused no matter which of the two mutually exclusive
+behaviors the implementation chose. This was Test's test defect, not an implementation defect, and
+not a contract ambiguity - confirmed independently before editing anything.
+
+**Fix**: removed the unused `librarySeriesRepository` stub from
+`should_applyTypeAndStatusFiltersTogetherAsAnAndCondition_when_bothAreRequested`. The test still
+proves the AND semantics AC-5 requires, now entirely within the movie branch: it stubs
+`libraryMovieRepository.findByUserId` with two movies, one `WATCHED` and one `PLANNED`, requests
+`type=MOVIE` AND `status=WATCHED`, and asserts exactly one item comes back (the watched movie) -
+the planned movie proves the status half of the AND is still enforced even though both movies match
+the type half. No series fixture or stub is needed to prove an AND condition between two filters
+that both apply within the movie branch; the series-repository-is-skipped behavior already has its
+own dedicated pin in `should_notQueryTheSeriesRepositoryAtAll_when_typeFilterIsMovieOnly`, so nothing
+about this change drops coverage.
+
+No AC or invariant coverage changed: AC-5 ("type and status combine with AND semantics") is still
+pinned by this same test, now without appealing to a scenario the contract's own algorithm forbids.
+
+**Full suite re-run**: `mvn clean verify` from `backend/` - all 65 test classes, 0 failures, 0
+errors (previously 1 error, the fixed test above). Full pass confirmed via every
+`target/surefire-reports/*.txt` file showing `Failures: 0, Errors: 0`.
+
+**Reviewed every other story-009 test file against the agreed contract and design decisions**
+(`story-009-api-contracts.md`, `story-009-agreed.md`) for the same class of defect - a stub or
+assertion that contradicts the algorithm, a signature mismatch, or an assertion pinning behavior the
+contract does not require:
+- `LibraryServiceTest.java` (remaining 23 tests) - all consistent with the algorithm's 10 numbered
+  steps, the 3-arg constructor, and the `lenient()` default stub for `librarySeasonRepository`
+  already reconciled in the prior log entry below.
+- `LibraryControllerTest.java`, `LibraryControllerPrincipalConventionTest.java` - request binding,
+  status codes, and `principal.userId()` threading all match the contract's `LibraryController`
+  listing exactly.
+- `LibraryListEndpointsSecurityTest.java` - full-stack 401/200 flows, two-user isolation, and the
+  unaffected `/api/health` / `/api/auth/me` checks all match AC-7 and the existing `SecurityConfig`
+  boundary; no widening of `permitAll()` asserted or implied.
+- `dto/LibraryListRequestValidationTest.java` - `@Min(1)` / `@Min(1) @Max(100)` bounds and the
+  "type/status carry no Bean Validation constraint" assumption both match the contract's
+  `LibraryListRequest` record exactly.
+- `LibrarySeriesRepositoryEagerFetchTest.java`, `LibrarySeasonRepositoryEagerFetchTest.java`,
+  `LibraryServiceEagerFetchIntegrationTest.java` - the single-bag `@EntityGraph` on
+  `findByUserId`, the standalone `findSeasonsWithEpisodesByLibrarySeriesIdIn` fetch, and the
+  session-sharing proof all match design decision 8 (round 2) with no residual round-1 two-level
+  `@EntityGraph` assumption anywhere.
+- `WatchStatusRollupTest.java` - every case (empty-is-Planned, all-Watched, all-Planned, any mix,
+  empty season within a series) matches the contract's stated rule with no deviation.
+- `LibraryMovieRepositoryTest.java`, `LibrarySeriesRepositoryTest.java` - the `findByUserId`
+  additions (added for this story on top of each file's pre-existing story-007/008 coverage) match
+  the "no match is `List.of()`, not an exception" invariant and correctly scope to one user.
+
+No other contradiction found. No genuine implementation bug found either - the full suite's clean
+pass means every AC-1 through AC-8 and every invariant this story owns already has a passing test,
+so there is nothing to list here as a defect left for Dev.
+
+Not opening a PR or posting a verdict comment from this run: no PR exists yet for this branch (`gh
+pr list --head feature/story-009-view-filter-library` returns empty), and Phase 3's PR-verdict
+hand-off is specifically for when Dev opens a PR or pushes a fix to one already open. That remains
+Dev's next move now that the test-side blocker is gone.
 
 ---
 

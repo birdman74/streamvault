@@ -263,15 +263,15 @@ class LibraryServiceTest {
     @Test
     void should_applyTypeAndStatusFiltersTogetherAsAnAndCondition_when_bothAreRequested() {
         when(libraryMovieRepository.findByUserId(USER_ID)).thenReturn(List.of(
-                movie(1L, 1L, "Watched Movie", 2000, null, WatchStatus.WATCHED, Instant.parse("2026-11-01T00:00:00Z"))));
-        when(librarySeriesRepository.findByUserId(USER_ID)).thenReturn(List.of(
-                series(1L, 2L, "Watched Series", 2001, null, Instant.parse("2026-11-02T00:00:00Z"), WatchStatus.WATCHED)));
+                movie(1L, 1L, "Watched Movie", 2000, null, WatchStatus.WATCHED, Instant.parse("2026-11-01T00:00:00Z")),
+                movie(2L, 2L, "Planned Movie", 2001, null, WatchStatus.PLANNED, Instant.parse("2026-11-02T00:00:00Z"))));
 
         LibraryListResponse response = libraryService.list(
                 USER_ID, List.of(LibraryItemType.MOVIE), List.of(WatchStatus.WATCHED), null, null);
 
         assertThat(response.items()).hasSize(1);
         assertThat(response.items().get(0).type()).isEqualTo("MOVIE");
+        assertThat(response.items().get(0).title()).isEqualTo("Watched Movie");
     }
 
     // ---- AC-6: pagination ----

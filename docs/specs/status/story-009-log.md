@@ -6,7 +6,60 @@
 
 Spec: `docs/specs/story-009-view-filter-library.md`
 Branch: `feature/story-009-view-filter-library`
-PR: none yet
+PR: none yet - blocked, see below
+
+---
+
+## Phase 2 Implementation: blocked by a self-contradiction in LibraryServiceTest (2026-11-08)
+
+Implemented every production class per `story-009-agreed.md`'s Implementation Plan:
+`LibraryItemType`, `WatchStatusRollup`, `LibraryMovieRepository.findByUserId`,
+`LibrarySeriesRepository.findByUserId` (`@EntityGraph(attributePaths = {"seasons"})`),
+`LibrarySeasonRepository` (new, `findSeasonsWithEpisodesByLibrarySeriesIdIn`), the three new DTOs
+(`LibraryListRequest`, `LibraryItemResponse`, `LibraryListResponse`), `LibraryService` (merge/
+filter/sort/paginate algorithm exactly per the contract's numbered steps, `@Transactional(readOnly
+= true)`), and `LibraryController` (`GET /api/library`, `principal.userId()` as the only source of
+the owning user id).
+
+`mvn compile` and `mvn test-compile` both pass clean - every test file Test committed compiles
+against the implementation with no signature mismatch, confirming the Phase 1 design-review
+conformance check held.
+
+`mvn test` on the full suite: 198 tests run, 0 failures, 1 error -
+`LibraryServiceTest.should_applyTypeAndStatusFiltersTogetherAsAnAndCondition_when_bothAreRequested`
+fails with `org.mockito.exceptions.misusing.UnnecessaryStubbingException` pointing at its own
+`when(librarySeriesRepository.findByUserId(USER_ID))...` stub (line 267).
+
+Root cause is a self-contradiction between two of Test's own committed tests in the same file,
+not an implementation defect - verified by checking that no alternative implementation choice
+satisfies both:
+
+- `should_notQueryTheSeriesRepositoryAtAll_when_typeFilterIsMovieOnly` (line 143) calls
+  `libraryService.list(USER_ID, List.of(LibraryItemType.MOVIE), null, null, null)` and asserts
+  `verifyNoInteractions(librarySeriesRepository)` - the series repository must receive zero calls
+  whenever the type filter is MOVIE-only. This matches the contract's algorithm step 5 ("Otherwise
+  (SERIES not in the effective type set) skip the whole series branch") exactly, and is what the
+  implementation does.
+- `should_applyTypeAndStatusFiltersTogetherAsAnAndCondition_when_bothAreRequested` (line 263-275)
+  calls `libraryService.list(USER_ID, List.of(LibraryItemType.MOVIE), List.of(WatchStatus.WATCHED),
+  null, null)` - the identical MOVIE-only type filter - but stubs
+  `librarySeriesRepository.findByUserId(USER_ID)` beforehand. `@ExtendWith(MockitoExtension.class)`
+  defaults to strict stubs with no class-level `@MockitoSettings(strictness = LENIENT)` and no
+  per-stub `lenient()` on this particular stub, so Mockito requires every stub to be used by that
+  test or fails it.
+
+An implementation that skips the series repository call for a MOVIE-only filter (the contract's
+own stated algorithm, and what the first test above pins) makes the second test's stub unused ->
+`UnnecessaryStubbingException`. An implementation that always calls both repositories and filters
+by type afterward instead would satisfy the second test but fail the first test's
+`verifyNoInteractions` assertion. No third implementation satisfies both simultaneously - this is
+not a design or contract problem (the contract's algorithm is unambiguous and the current
+implementation follows it exactly), it is Test's test file asserting two mutually exclusive
+behaviors for the same input shape.
+
+Per Dev's CLAUDE.md Phase 2 instructions, stopping here rather than editing `LibraryServiceTest.java`
+or adding implementation workarounds. Implementation is committed on this branch in its current
+(contract-correct) form; no PR opened. Ending this run with a `NEEDS BRIAN` message.
 
 ---
 

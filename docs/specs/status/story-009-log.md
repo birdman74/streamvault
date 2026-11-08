@@ -10,6 +10,44 @@ PR: none yet
 
 ---
 
+## Test reconciliation gap: LibraryServiceTest not amended for round 2 constructor (2026-11-08)
+
+Brian flagged that `LibraryServiceTest.java` was never amended after round 2 changed
+`LibraryService`'s constructor from 2 arguments (`LibraryMovieRepository`,
+`LibrarySeriesRepository`) to 3 (adding `LibrarySeasonRepository`, per
+`story-009-test-revision-r2.md`'s Test Code Reconciliation table and
+`story-009-api-contracts.md`'s contract). Line 56 of the committed test still called the old
+2-argument constructor - a gap in round 2's reconciliation that should have been caught then and
+was not.
+
+Fixed: added a `@Mock LibrarySeasonRepository librarySeasonRepository` field; `setUp()` now
+constructs `LibraryService` with all three repositories, matching the contract exactly. Added one
+`lenient()` default stub (`findSeasonsWithEpisodesByLibrarySeriesIdIn(anyList()) -> List.of()`) in
+`setUp()` rather than per-test: this mock exists only so the round 2 contract's session-sharing side
+effect (attaching fetched episodes onto already-loaded `LibrarySeason` entities by identity within
+one Hibernate session) has something to call into. A plain Mockito unit test has no real session for
+that side effect to act on, and no assertion in this file depends on what the mock returns - every
+`series(...)` fixture already carries its seasons/episodes fully populated in memory via `addSeason`
+/ `addEpisode`, which is what `WatchStatusRollup.seriesStatus(...)` actually reads. The real
+session-sharing guarantee remains covered separately by `LibraryServiceEagerFetchIntegrationTest`
+against a real Spring context - unaffected by this fix.
+
+No other test in this file changed: none of them asserted on `LibrarySeasonRepository` and none
+needed to, since the contract's `LibraryService.list(...)` algorithm only calls
+`findSeasonsWithEpisodesByLibrarySeriesIdIn` for its session-sharing side effect, not for any value
+these fixtures' in-memory entities don't already carry.
+
+Updated `story-009-test-plan.md`'s "Service unit tests" bullet to describe the three-repository
+mock setup and the lenient default stub, so the plan matches the test file as committed.
+
+Verified: ran `mvn compile test-compile` from `backend/`. Confirmed the only compile errors are the
+expected Phase 1 RED state - `LibraryService`, `LibraryItemType`, `WatchStatusRollup`,
+`LibrarySeasonRepository`, and the DTOs do not exist in `src/main` yet (checked directly;
+`LibraryService.java` is absent from `src/main/java/com/streamvault/backend/library`) - and that no
+new or different error is attributable to this file. No production code touched.
+
+---
+
 ## Phase 1 Design Review: Dev round 3 - agreed (2026-11-06)
 
 Responds to `docs/specs/design/story-009-test-revision-r2.md`. Full detail in

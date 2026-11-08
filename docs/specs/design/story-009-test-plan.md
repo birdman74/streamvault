@@ -59,16 +59,25 @@ endpoint with no write path and no TMDB call:
   annotation - an unrecognized string in either is a binding failure at the HTTP layer (Layer 1),
   not a Bean Validation concern at this layer, mirroring `TmdbBrowseRequest.list`'s precedent exactly.
 
-- **Service unit tests (`library/LibraryServiceTest`)** - Mockito, mocks `LibraryMovieRepository`
-  and `LibrarySeriesRepository`. The home for the merge/filter/sort/paginate algorithm: type
-  filtering (including that the "wrong" repository is never even queried when a type is excluded,
-  AC-3), status filtering including the any-of-several-statuses case (AC-4), type+status combined as
-  AND (AC-5), pagination math and the beyond-last-page empty case (AC-6, AC-8), empty-library and
-  no-match-at-all empty results (AC-8), strict user-scoping of both repository calls (AC-7), the
-  sort order (`addedAt` desc, `type` asc, `id` asc) proven with crafted fixtures whose `addedAt`
-  values deliberately collide to exercise the tie-break, and that a series' status in both the
-  response and the status filter is always `WatchStatusRollup.seriesStatus(...)`, never a raw
-  episode value.
+- **Service unit tests (`library/LibraryServiceTest`)** - Mockito, mocks `LibraryMovieRepository`,
+  `LibrarySeriesRepository`, and `LibrarySeasonRepository` (constructed with all three, per the
+  round 2 contract). The home for the merge/filter/sort/paginate algorithm: type filtering (including
+  that the "wrong" repository is never even queried when a type is excluded, AC-3), status filtering
+  including the any-of-several-statuses case (AC-4), type+status combined as AND (AC-5), pagination
+  math and the beyond-last-page empty case (AC-6, AC-8), empty-library and no-match-at-all empty
+  results (AC-8), strict user-scoping of both query repository calls (AC-7), the sort order
+  (`addedAt` desc, `type` asc, `id` asc) proven with crafted fixtures whose `addedAt` values
+  deliberately collide to exercise the tie-break, and that a series' status in both the response and
+  the status filter is always `WatchStatusRollup.seriesStatus(...)`, never a raw episode value.
+  `LibrarySeasonRepository.findSeasonsWithEpisodesByLibrarySeriesIdIn` is given one lenient default
+  stub (`anyList()` -> `List.of()`) in `setUp()`, not per test: this mock exists only so the
+  round-2 contract's session-sharing side effect has something to call into, and with no real
+  Hibernate session in a Mockito-only test, `WatchStatusRollup.seriesStatus(...)` reads the
+  seasons/episodes each `series(...)` fixture already carries in memory via `addSeason` /
+  `addEpisode` regardless of what that mock returns. The session-sharing behavior itself - that the
+  two repository calls must actually attach onto the same entity instances - is not provable with
+  mocks and is covered separately by `LibraryServiceEagerFetchIntegrationTest` against a real Spring
+  context.
 
 - **Controller slice test (`library/LibraryControllerTest`)** - `@WebMvcTest(LibraryController.class)`,
   `@AutoConfigureMockMvc(addFilters = false)`, `@Import(SecurityConfig.class)`,

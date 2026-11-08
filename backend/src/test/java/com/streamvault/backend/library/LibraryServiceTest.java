@@ -1,6 +1,8 @@
 package com.streamvault.backend.library;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -24,8 +26,15 @@ import com.streamvault.backend.library.dto.LibraryListResponse;
  * {@code LibraryListResponse} exist yet, and neither repository has a {@code findByUserId} method
  * yet; this test is expected to fail to compile until Dev implements them.
  *
- * <p>Mockito, mocks both repositories, mirrors {@code LibraryMovieServiceTest} /
- * {@code LibrarySeriesServiceTest}. The home for the merge/filter/sort/paginate algorithm: type
+ * <p>Mockito, mocks all three repositories ({@code LibraryMovieRepository},
+ * {@code LibrarySeriesRepository}, {@code LibrarySeasonRepository}), mirrors
+ * {@code LibraryMovieServiceTest} / {@code LibrarySeriesServiceTest}. {@code LibrarySeasonRepository}
+ * exists only so the round-2 contract's {@code findSeasonsWithEpisodesByLibrarySeriesIdIn} side
+ * effect has something to call into a real Hibernate session when Dev implements it; in this plain
+ * Mockito test there is no real session to attach fetched episodes onto, so every series fixture is
+ * built with its seasons/episodes already fully populated in memory via {@code addSeason} /
+ * {@code addEpisode}, and the mock is given a harmless default return value in {@link #setUp()}
+ * that no assertion here depends on. The home for the merge/filter/sort/paginate algorithm: type
  * filtering (AC-3) including that the excluded repository is never even queried, status filtering
  * (AC-4) including the any-of-several case, type+status combined as AND (AC-5), pagination math and
  * the beyond-last-page empty case (AC-6, AC-8), empty results (AC-8), strict user-scoping of both
@@ -49,11 +58,17 @@ class LibraryServiceTest {
     @Mock
     private LibrarySeriesRepository librarySeriesRepository;
 
+    @Mock
+    private LibrarySeasonRepository librarySeasonRepository;
+
     private LibraryService libraryService;
 
     @BeforeEach
     void setUp() {
-        libraryService = new LibraryService(libraryMovieRepository, librarySeriesRepository);
+        libraryService = new LibraryService(
+                libraryMovieRepository, librarySeriesRepository, librarySeasonRepository);
+        lenient().when(librarySeasonRepository.findSeasonsWithEpisodesByLibrarySeriesIdIn(anyList()))
+                .thenReturn(List.of());
     }
 
     private LibraryMovie movie(long id, long tmdbId, String title, Integer year, String poster,

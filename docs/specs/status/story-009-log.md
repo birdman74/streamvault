@@ -6,7 +6,34 @@
 
 Spec: `docs/specs/story-009-view-filter-library.md`
 Branch: `feature/story-009-view-filter-library`
-PR: none yet
+PR: TBD
+
+---
+
+## Phase 2 close-out: re-verified green suite, opened PR (2026-11-08)
+
+Picked up from Test's Phase 3 fix (00abf7e) with the branch unblocked and no PR yet. Re-ran
+`mvn clean verify` myself rather than trusting the prior log entry at face value: 385 tests, 0
+failures, 0 errors, `BUILD SUCCESS`, including `LibraryServiceTest` (21), `WatchStatusRollupTest`
+(11), and `StreamvaultBackendApplicationTests` (1, full Spring context boot).
+
+Checked the two lower-level unit test commitments from `story-009-agreed.md`'s Test Coverage
+Confirmation before deciding whether anything was still owed:
+- `WatchStatusRollup` edge cases: `WatchStatusRollupTest` (Test's file, committed in 0e2037f)
+  already pins empty-is-Planned, all-Watched, all-Planned, every mixed-pair/triple combination,
+  single-element, the two-level series rollup, a series with no seasons, and a season with no
+  episodes. No case from the contract's stated rule is unpinned; adding a parallel Dev-authored
+  test here would just duplicate existing coverage.
+- Constructor/DI wiring for the new three-repository `LibraryService`: `StreamvaultBackendApplicationTests`
+  boots the full Spring context, which fails if `LibraryService`'s constructor cannot be satisfied
+  by the real `LibraryMovieRepository`/`LibrarySeriesRepository`/`LibrarySeasonRepository` beans.
+  That already exercises the exact wiring concern the agreed design flagged; a dedicated duplicate
+  test would add no coverage a plain constructor-injected `@Service` needs.
+
+No gap found, so no new test files added this round. Opening a PR (`feature/story-009-view-filter-library`
+-> `main`) as `claude-streamvault-dev`; issue #30 (`needs-brian: story-009 Dev implementation stalled`)
+was opened against the now-resolved blocker from the e021cf3 run and is left for the pipeline's own
+blocked-label reconciliation rather than closed by hand here.
 
 ---
 

@@ -23,13 +23,13 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 | 🔴 Red | Last Updated 7+ days ago OR blocked with no plan to unblock |
 
 ### Last Updated
-2026-11-08 (Test)
+2026-11-08 (Dev)
 
 ### Current Phase
 Application Development - User Authentication epic complete and merged (STORY-001, STORY-002).
 Autonomous Agentic Workflow epic complete (STORY-003, STORY-004). Personal Streaming Library epic
 defined by PO: STORY-005 through STORY-019 spec'ed and queued for Test and Dev. STORY-008 merged,
-STORY-009 design agreed, Dev starting implementation.
+STORY-009 implemented, full suite green, PR opened.
 
 ---
 
@@ -106,7 +106,7 @@ Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the q
 - [x] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Completed - Full trace: `docs/specs/status/story-006-log.md`
 - [x] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Completed - Full trace: `docs/specs/status/story-007-log.md`
 - [x] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006 - Completed - Full trace: `docs/specs/status/story-008-log.md`
-- [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008 - Test fixed test contradiction, full suite green, awaiting PR - Full trace: `docs/specs/status/story-009-log.md`
+- [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008 - PR opened, awaiting Test verification - Full trace: `docs/specs/status/story-009-log.md`
 - [ ] STORY-010: Set Movie Watch Status (`docs/specs/story-010-set-movie-watch-status.md`) - prereq STORY-007
 - [ ] STORY-011: Remove Item from Library (`docs/specs/story-011-remove-library-item.md`) - prereq STORY-007, STORY-008
 - [ ] STORY-012: Series Progress by Episode with Season and Series Roll-Up (`docs/specs/story-012-series-episode-status-rollup.md`) - prereq STORY-008

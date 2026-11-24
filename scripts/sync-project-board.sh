@@ -23,7 +23,7 @@
 #              scopes (PROJECT_BOARD_GH_TOKEN). GITHUB_TOKEN and fine-grained
 #              PATs cannot reach a user-owned Projects V2 board.
 #   GH_REPO    owner/repo
-# Optional env:
+# Optional env (the workflow sets these from .github/pipeline-config.env):
 #   PROJECT_OWNER        user that owns the board (default: owner of GH_REPO)
 #   PROJECT_TITLE        board title (default: StreamVault)
 #   STATUS_FIELD         single-select field name (default: Status)

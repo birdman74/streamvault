@@ -1,0 +1,88 @@
+# Brian submitted a Changes Requested review:
+#   story PR (feature/) -> test-brian-review (Test Phase 4)
+#   specs PR (specs/)   -> po-spec-revision (PO revises the specs)
+#
+# Thin adapter (ADR-005): a gate job on a GitHub-hosted runner reads the
+# event, and scripts/transition.sh (from main) decides whether a persona is
+# needed. The persona job calls persona-run.yml at @main, so everything but
+# this event wiring always comes from main.
+name: Pipeline - Review Submitted
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  gate:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    if: |
+      github.event.review.state == 'changes_requested'
+    outputs:
+      run: ${{ steps.route.outputs.run }}
+      transition: ${{ steps.route.outputs.transition }}
+      persona: ${{ steps.route.outputs.persona }}
+      story_id: ${{ steps.route.outputs.story_id }}
+      branch: ${{ steps.route.outputs.branch }}
+      pr_number: ${{ steps.route.outputs.pr_number }}
+      round: ${{ steps.route.outputs.round }}
+      mode: ${{ steps.route.outputs.mode }}
+      ref_id: ${{ steps.route.outputs.ref_id }}
+      ref_time: ${{ steps.route.outputs.ref_time }}
+      stage: ${{ steps.route.outputs.stage }}
+      resume: ${{ steps.route.outputs.resume }}
+      prompt: ${{ steps.route.outputs.prompt }}
+    steps:
+      - name: Checkout pipeline scripts from main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Route event to a hand-off
+        id: route
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REVIEWER: ${{ github.event.review.user.login }}
+          REVIEW_STATE: ${{ github.event.review.state }}
+          REVIEW_AT: ${{ github.event.review.submitted_at }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          chmod +x scripts/*.sh
+          # Exit 1 means the gate already escalated (a round limit); exit 2 is
+          # a gate error, escalated by the next step so it never fails silently
+          ./scripts/transition.sh route review-submitted || { CODE=$?; echo "exit_code=$CODE" >> "$GITHUB_OUTPUT"; exit "$CODE"; }
+
+      - name: Escalate a gate error
+        if: failure() && steps.route.outputs.exit_code == '2'
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          STORY_ID: pipeline
+          STAGE: gate error in ${{ github.workflow }}
+          REASON: The gate could not read GitHub state (or hit an unexpected one), so no persona was launched for this event. The run log shows the failing call.
+          RESUME: Re-run the failed jobs of the linked workflow run once GitHub is healthy, or run 'Pipeline - Manual Dispatch' for the hand-off this event should have started.
+        run: ./scripts/escalate-to-brian.sh
+
+  persona:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    uses: birdman74/streamvault/.github/workflows/persona-run.yml@main
+    secrets: inherit
+    with:
+      transition: ${{ needs.gate.outputs.transition }}
+      persona: ${{ needs.gate.outputs.persona }}
+      story_id: ${{ needs.gate.outputs.story_id }}
+      branch: ${{ needs.gate.outputs.branch }}
+      pr_number: ${{ needs.gate.outputs.pr_number }}
+      round: ${{ needs.gate.outputs.round }}
+      mode: ${{ needs.gate.outputs.mode }}
+      ref_id: ${{ needs.gate.outputs.ref_id }}
+      ref_time: ${{ needs.gate.outputs.ref_time }}
+      stage: ${{ needs.gate.outputs.stage }}
+      resume: ${{ needs.gate.outputs.resume }}
+      prompt: ${{ needs.gate.outputs.prompt }}

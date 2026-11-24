@@ -1,7 +1,7 @@
 # ADR-002: Push-Triggered Workflow Guard Pattern
 
 **Date**: 2026-09-23
-**Status**: Accepted (amended 2026-11-07)
+**Status**: Accepted (amended 2026-11-07; amended 2026-11-24 by ADR-005)
 **Deciders**: Brian Campbell
 
 ---
@@ -64,5 +64,12 @@ This lists exactly the files the commit brought into the branch for regular, squ
 **Prohibit force-pushes to feature branches via branch protection.** Rejected. Reordering commits before merge (e.g. moving a pre-merge STATUS.md update after the last substantive commit) is a legitimate and useful part of Brian's own workflow. The bug is in trusting an unreliable GitHub trigger mechanism, not in the git operation that exposed it.
 
 **Rely on `paths:` filters alone with tighter glob patterns.** Rejected. The failure mode is not glob imprecision, it is that GitHub's diff calculation for a force-push does not reliably reflect the actual file state of the resulting commit. A tighter glob narrows what can match but does not fix the underlying unreliability.
+
+---
+
+## Amendment 2026-11-24: ADR-005
+
+The decision stands: every push is checked for commit authorship and live state before any persona launches. Both checks now run in one place, the gate of `pipeline-feature-push.yml` and `pipeline-main-and-merge.yml` via `scripts/transition.sh route`, and they read live state from the GitHub API rather than the triggering commit's tree. The gate computes the pushed file list itself (everything since `main` for a new branch, the first-parent diff for a force-push, the previous-head range otherwise), so feature-branch adapters no longer use `paths:` filters. See [ADR-005](ADR-005-pipeline-core-and-direct-persona-loops.md). The workflow names above are historical: the `trigger-*.yml` files were replaced by `scripts/transition.sh`, the reusable `persona-run.yml`, and six `pipeline-*.yml` adapters.
+
 
 **Add a per-branch concurrency lock to prevent multiple workflows firing simultaneously.** Not adopted as a replacement. This would reduce the chance of overlapping container runs but does nothing to prevent a single workflow from launching a container with no real work to do. May be worth adding later as a secondary safeguard against concurrent runs, but it does not address the root cause and is not a substitute for the author/state checks above.

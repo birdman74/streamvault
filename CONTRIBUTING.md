@@ -30,6 +30,10 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 - Test persona must post a test run summary as a PR comment before Brian reviews. Its first line is the verdict marker (`<!-- test-verdict: APPROVED -->` or `<!-- test-verdict: CHANGES_REQUESTED -->`); a `CHANGES_REQUESTED` verdict wakes Dev automatically (ADR-004)
 - Brian reviews only after Test's latest verdict is `APPROVED`. Step-by-step instructions for both outcomes (Approve and merge, or Request changes) are in the [PR Review Guide](https://github.com/birdman74/ai-dev-toolkit/blob/main/docs/agentic-workflow-diagram.md#brians-pr-review-guide)
 
+### Pipeline Changes
+- Every pipeline knob (round limits, timeouts, accounts, board names) lives in `.github/pipeline-config.env`. Never hard-code one in a workflow, script or persona file.
+- Every hand-off rule lives in `scripts/transition.sh`. Workflows stay thin adapters; see ADR-005 before adding one.
+
 ### STATUS.md
 Every meaningful commit must include a STATUS.md update in the same commit:
 - Update `Last Updated` date to today (YYYY-MM-DD)
@@ -121,7 +125,8 @@ Existing ADRs:
 - [ADR-001](docs/adr/ADR-001-spring-mvc-test-auth-pattern.md) -- Spring MVC controller test authentication pattern
 - [ADR-002](docs/adr/ADR-002-push-trigger-guard-pattern.md) -- Push-triggered workflow guard pattern (commit-author and state checks required before launching a persona container)
 - [ADR-003](docs/adr/ADR-003-persona-outcome-verification.md) -- Persona outcome verification (every persona launch verifies its expected result and escalates to Brian when it is missing)
-- [ADR-004](docs/adr/ADR-004-test-verdict-comment-triggers-dev.md) -- Test verdict comment is the only trigger for Dev fixes (`<!-- test-verdict: ... -->` marker; fix rounds capped at 3 per Brian review)
+- [ADR-004](docs/adr/ADR-004-test-verdict-comment-triggers-dev.md) -- Test verdict comment is the only trigger for Dev fixes (`<!-- test-verdict: ... -->` marker; fix rounds capped by `DEV_FIX_ROUND_LIMIT` per Brian review)
+- [ADR-005](docs/adr/ADR-005-pipeline-core-and-direct-persona-loops.md) -- Pipeline core (`scripts/transition.sh`, reusable `persona-run.yml`, thin `pipeline-*.yml` adapters), one config file (`.github/pipeline-config.env`), and direct persona loops for defective tests and acceptance-criteria questions
 
 If your decision is not covered by an existing ADR, flag it to Brian. New ADRs are created when a decision has significant long-term consequences and alternatives were considered.
 
@@ -140,7 +145,9 @@ All files use LF line endings, enforced by `.gitattributes`. When pasting conten
 | Architectural decisions with alternatives | `docs/adr/` |
 | Coding and testing conventions | `CONTRIBUTING.md` (this file) |
 | Story requirements and acceptance criteria | `docs/specs/story-NNN-*.md` |
-| Design artifacts (test plans, contracts) | `docs/specs/design/` |
+| Design artifacts (test plans, contracts, feedback, PO questions and answers) | `docs/specs/design/` |
+| Pipeline thresholds, accounts and timing | `.github/pipeline-config.env` |
+| Pipeline hand-off rules (routing, prompts, expected outcomes) | `scripts/transition.sh` |
 | Deferred work and open questions | `docs/specs/backlog.md` |
 | Project health and story status | `STATUS.md` |
 | Project history and lessons learned | `ai-dev-toolkit/DEVLOG.md` |

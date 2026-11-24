@@ -4,10 +4,11 @@
 # closed story back to Ready.
 #
 # Fires on every issue event that can change a story's column (including the
-# label edits made by sync-blocked-labels.yml and trigger-test-next-story.yml),
+# label edits made by sync-blocked-labels.yml and pipeline-main-and-merge.yml),
 # and on manual dispatch: one issue, or every story issue when the issue
 # number is left blank, with an optional dry run.
 #
+# Board, field and column names: .github/pipeline-config.env.
 # Token: PROJECT_BOARD_GH_TOKEN, a classic PAT from birdman74 with 'project'
 # and 'repo' scopes. GITHUB_TOKEN and fine-grained PATs cannot reach a
 # user-owned Projects V2 board (they silently find no item).
@@ -54,7 +55,7 @@ jobs:
 
       - name: Wait for GitHub API to reflect the issue change
         if: github.event_name == 'issues'
-        run: sleep 10
+        run: sleep "$(bash scripts/pipeline-config.sh get API_PROPAGATION_WAIT_SECONDS)"
 
       - name: Sync board
         env:
@@ -63,7 +64,9 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
           DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
         run: |
-          chmod +x scripts/sync-project-board.sh
+          chmod +x scripts/*.sh
+          # Board title, Status field and column names come from the config
+          source scripts/pipeline-config.sh
           if [ -n "$ISSUE_NUMBER" ]; then
             ./scripts/sync-project-board.sh "$ISSUE_NUMBER"
           else

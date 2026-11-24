@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Verify required files exist
         run: |
@@ -33,7 +33,7 @@ jobs:
       - name: Verify .env is not committed
         run: |
           if git ls-files --error-unmatch .env 2>/dev/null; then
-            echo "❌ .env is committed — remove it immediately"
+            echo "❌ .env is committed - remove it immediately"
             exit 1
           else
             echo "✅ .env is not committed"
@@ -47,7 +47,7 @@ jobs:
     needs: validate
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check if backend exists
         id: backend_check
@@ -56,7 +56,7 @@ jobs:
             echo "exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⚠️ backend/pom.xml not found — skipping build. Add Spring Boot project to backend/ to enable."
+            echo "⚠️ backend/pom.xml not found - skipping build. Add Spring Boot project to backend/ to enable."
           fi
 
       - name: Set up Java 25
@@ -97,7 +97,7 @@ jobs:
     needs: validate
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check if frontend exists
         id: frontend_check
@@ -106,7 +106,7 @@ jobs:
             echo "exists=true" >> $GITHUB_OUTPUT
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⚠️ frontend/package.json not found — skipping build. Add Next.js project to frontend/ to enable."
+            echo "⚠️ frontend/package.json not found - skipping build. Add Next.js project to frontend/ to enable."
           fi
 
       - name: Set up Node.js

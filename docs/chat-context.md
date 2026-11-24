@@ -13,8 +13,10 @@ StreamVault is a personal streaming library tracker built as a portfolio project
 - Framework: `github.com/birdman74/ai-dev-toolkit`
 - Stack: Java 25 / Spring Boot 3.5.x backend, Next.js/TypeScript frontend, PostgreSQL + MongoDB Atlas, AWS EC2
 - Runner: self-hosted GitHub Actions runner at `/home/brian/actions-runner`
-- Bot account: `briankcampbell-streamvault-bot` (classic token for PR automation)
+- Bot account: `briankcampbell-streamvault-bot` (`STREAMVAULT_BOT_GH_TOKEN`, classic token: PRs, verdicts, escalations)
 - Queue manager token: `QUEUE_MANAGER_GH_TOKEN` (fine-grained PAT from `birdman74` for issue label operations)
+- Board token: `PROJECT_BOARD_GH_TOKEN` (classic PAT from `birdman74`, `project` + `repo` scopes, for the user-owned project board)
+- Pipeline knobs: `.github/pipeline-config.env`; hand-off rules: `scripts/transition.sh` (ADR-005)
 
 ---
 
@@ -27,7 +29,10 @@ StreamVault is a personal streaming library tracker built as a portfolio project
 | STORY-003 | Merged -- build tooling |
 | STORY-004 | Merged -- PR automation |
 | STORY-005 | Merged -- account settings / rating type |
-| STORY-006 | <!-- IN PROGRESS / MERGED --> |
+| STORY-006 | Merged -- TMDB search and browse |
+| STORY-007 | Merged -- add movie from TMDB |
+| STORY-008 | Merged -- add series from TMDB |
+| STORY-009 | In progress -- view and filter library (PR #31) |
 
 Active epic: Personal Streaming Library (STORY-006 through STORY-019)
 
@@ -37,9 +42,9 @@ Active epic: Personal Streaming Library (STORY-006 through STORY-019)
 
 <!-- Update this section at the start of each session -->
 
-- Story in progress: STORY-006
-- Branch: feature/story-006-...
-- PR: #...
+- Story in progress: STORY-009
+- Branch: feature/story-009-view-filter-library
+- PR: #31
 - Phase: <!-- Test writing tests / Dev implementing / Brian reviewing / etc. -->
 - Runner status: <!-- running / stopped -->
 - EC2 status: <!-- running / stopped -->
@@ -50,11 +55,11 @@ Active epic: Personal Streaming Library (STORY-006 through STORY-019)
 
 <!-- Keep last 3-5 significant changes here, oldest at bottom -->
 
-- `sync-project-board.yml` added -- auto-syncs issue labels to project board columns via GITHUB_TOKEN GraphQL
-- `trigger-test-next-story.yml` -- 30s sleep added after issue close to prevent race condition with GitHub API
-- All push-triggered workflows standardized: `github.actor == 'birdman74' || github.actor == 'briankcampbell-streamvault-bot' || github.event_name == 'workflow_dispatch'`
-- Test path filter changed to `**/src/test/**` and `**/__tests__/**` to cover backend and frontend
-- Docker images rebuilt with project-specific WORKDIR for Claude Code memory isolation
+- ADR-005 (2026-11-24): `trigger-*.yml` replaced by `scripts/transition.sh` + reusable `persona-run.yml` + six `pipeline-*.yml` adapters; all knobs in `.github/pipeline-config.env`; direct Dev-Test defective-test loop and PO clarification loop; escalations self-close and name the Manual Dispatch to resume
+- Persona launchers use a unique container name per run and remove it on exit or timeout; unused `STREAMVAULT_BOT_GH_TOKEN` pass-through removed from compose files
+- `sync-project-board.yml` (2026-11-24): `PROJECT_BOARD_GH_TOKEN`, live issue state, columns resolved by name, sync-all mode
+- ADR-003 and ADR-004 (2026-11-07): persona outcome verification and `needs-brian` escalation; Test verdict comment is the only Dev-fix trigger
+- Blocked labels reconciled automatically on story close (`sync-blocked-labels.yml`)
 
 ---
 
@@ -62,8 +67,7 @@ Active epic: Personal Streaming Library (STORY-006 through STORY-019)
 
 <!-- Clear items when resolved -->
 
-- Bot account cannot formally approve PRs it opened -- Test posts a comment instead (known limitation)
-- Verify `sync-project-board.yml` works correctly when issue labels change on STORY-006
+- Bot account cannot formally approve PRs it opened -- Test posts a verdict comment instead (ADR-004)
 
 ---
 
@@ -72,7 +76,9 @@ Active epic: Personal Streaming Library (STORY-006 through STORY-019)
 | What | Where |
 |---|---|
 | Persona CLAUDE.md files | `/mnt/e/dev/streamvault/.claude/personas/{po,dev,test}/CLAUDE.md` |
-| Workflow trigger files | `/mnt/e/dev/streamvault/.github/workflows/` |
+| Pipeline workflows | `/mnt/e/dev/streamvault/.github/workflows/` (`pipeline-*.yml`, `persona-run.yml`) |
+| Pipeline config | `/mnt/e/dev/streamvault/.github/pipeline-config.env` |
+| Hand-off rules | `/mnt/e/dev/streamvault/scripts/transition.sh` |
 | Story specs | `/mnt/e/dev/streamvault/docs/specs/` |
 | ADRs | `/mnt/e/dev/streamvault/docs/adr/` |
 | Docker compose files | `/mnt/e/docker/claude-streamvault-{po,dev,test}/` |

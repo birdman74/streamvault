@@ -1,0 +1,168 @@
+# Reusable workflow: runs ONE persona for ONE hand-off (ADR-005).
+#
+# Every adapter workflow (pipeline-*.yml) calls this file at @main, so the
+# launch, verification, escalation and cleanup logic always comes from main,
+# even for pushes to feature branches created before a change.
+#
+#   1. recheck   the hand-off is still needed (a run can wait hours behind
+#                another persona on the single self-hosted runner)
+#   2. record    branch head, PR state and start time before launch
+#   3. launch    the persona container, with the step timeout from config
+#   4. cleanup   remove the container, even after a timeout or cancel
+#   5. verify    the expected result exists on GitHub (ADR-003)
+#   6. escalate  open a needs-brian issue and end red when it does not
+#   7. resolve   close the story's open needs-brian issues when it does
+#
+# All rules (state checks, prompts, expected results) live in
+# scripts/transition.sh; all knobs live in .github/pipeline-config.env.
+name: Pipeline - Persona Run
+
+on:
+  workflow_call:
+    inputs:
+      transition: { type: string, required: true }
+      persona: { type: string, required: true }
+      story_id: { type: string, required: true }
+      branch: { type: string, required: false, default: '' }
+      pr_number: { type: string, required: false, default: '' }
+      round: { type: string, required: false, default: '' }
+      mode: { type: string, required: false, default: '' }
+      ref_id: { type: string, required: false, default: '' }
+      ref_time: { type: string, required: false, default: '' }
+      stage: { type: string, required: true }
+      resume: { type: string, required: false, default: '' }
+      prompt: { type: string, required: true }
+
+jobs:
+  persona:
+    permissions:
+      contents: read
+    runs-on: self-hosted
+    env:
+      GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      TRANSITION: ${{ inputs.transition }}
+      PERSONA: ${{ inputs.persona }}
+      STORY_ID: ${{ inputs.story_id }}
+      BRANCH: ${{ inputs.branch }}
+      PR_NUMBER: ${{ inputs.pr_number }}
+      ROUND: ${{ inputs.round }}
+      MODE: ${{ inputs.mode }}
+      REF_ID: ${{ inputs.ref_id }}
+      REF_TIME: ${{ inputs.ref_time }}
+      PERSONA_CONTAINER_NAME: sv-${{ inputs.persona }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Checkout pipeline scripts from main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Load pipeline config
+        id: config
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/pipeline-config.sh
+
+      - name: Recheck that the hand-off is still needed
+        id: recheck
+        run: |
+          ./scripts/transition.sh recheck "$TRANSITION" && CODE=0 || CODE=$?
+          if [ "$CODE" -eq 1 ]; then
+            echo "::notice::$TRANSITION for $STORY_ID is no longer needed - skipping launch."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            # Error (2) fails open: launching is safe because verify still checks the result
+            [ "$CODE" -eq 2 ] && echo "::warning::Recheck could not read GitHub state - launching anyway."
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Record state before launch
+        id: pre
+        if: steps.recheck.outputs.needed == 'true'
+        run: |
+          # Backdated 60s so runner/GitHub clock skew cannot hide activity
+          echo "started_at=$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          if [ -n "$BRANCH" ]; then
+            HEAD_SHA_BEFORE=$(./scripts/persona-outcome-check.sh head-sha "$BRANCH")
+            echo "head_sha=$HEAD_SHA_BEFORE" >> "$GITHUB_OUTPUT"
+            echo "Head of $BRANCH before launch: $HEAD_SHA_BEFORE"
+            OPEN_PR=$(./scripts/persona-outcome-check.sh pr-number "$BRANCH")
+            echo "pr_open_at_start=$([ -n "$OPEN_PR" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          else
+            echo "pr_open_at_start=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Launch persona
+        id: launch
+        if: steps.recheck.outputs.needed == 'true'
+        # A step timeout is a failure (escalates); the 6h job timeout would be
+        # a cancellation, which skips escalation. pipeline-config.sh keeps
+        # PERSONA_TIMEOUT_MINUTES at or below 330.
+        timeout-minutes: ${{ fromJSON(steps.config.outputs.PERSONA_TIMEOUT_MINUTES) }}
+        shell: bash
+        env:
+          PROMPT: ${{ inputs.prompt }}
+          PO_LAUNCHER: ${{ steps.config.outputs.PO_LAUNCHER }}
+          DEV_LAUNCHER: ${{ steps.config.outputs.DEV_LAUNCHER }}
+          TEST_LAUNCHER: ${{ steps.config.outputs.TEST_LAUNCHER }}
+        run: |
+          case "$PERSONA" in
+            po) LAUNCHER="$PO_LAUNCHER" ;;
+            dev) LAUNCHER="$DEV_LAUNCHER" ;;
+            test) LAUNCHER="$TEST_LAUNCHER" ;;
+            *) echo "Unknown persona '$PERSONA'"; exit 1 ;;
+          esac
+          echo "Launching $PERSONA for $TRANSITION ($STORY_ID) in container $PERSONA_CONTAINER_NAME"
+          # shell: bash runs with pipefail, so a launcher failure is not hidden by tee
+          "$LAUNCHER" "$PROMPT" 2>&1 | tee "$RUNNER_TEMP/persona-output.log"
+
+      - name: Remove persona container
+        if: always() && steps.recheck.outputs.needed == 'true'
+        run: docker rm -f "$PERSONA_CONTAINER_NAME" > /dev/null 2>&1 || true
+
+      - name: Verify persona produced the expected outcome
+        id: outcome
+        if: ${{ !cancelled() && steps.recheck.outputs.needed == 'true' }}
+        env:
+          STARTED_AT: ${{ steps.pre.outputs.started_at }}
+          HEAD_SHA_BEFORE: ${{ steps.pre.outputs.head_sha }}
+          PR_OPEN_AT_START: ${{ steps.pre.outputs.pr_open_at_start }}
+          LAUNCH_OUTCOME: ${{ steps.launch.outcome }}
+          ATTEMPTS: ${{ steps.config.outputs.OUTCOME_CHECK_ATTEMPTS }}
+          INTERVAL: ${{ steps.config.outputs.OUTCOME_CHECK_INTERVAL_SECONDS }}
+        run: |
+          # Retry: GitHub can take a moment to reflect the persona's final push
+          for i in $(seq 1 "$ATTEMPTS"); do
+            sleep "$INTERVAL"
+            CHECK_RESULT=$(./scripts/transition.sh verify "$TRANSITION" 2>&1) && CHECK_CODE=0 || CHECK_CODE=$?
+            [ "$CHECK_CODE" -eq 0 ] && break
+            echo "Check attempt $i: $CHECK_RESULT"
+          done
+          echo "$CHECK_RESULT"
+          REASON=$(echo "$CHECK_RESULT" | tr '\n' ' ')
+          if [ "$LAUNCH_OUTCOME" != "success" ]; then
+            REASON="Persona was not launched, its launcher failed, or it timed out (launch step: ${LAUNCH_OUTCOME:-not run}). Its container was removed. Outcome check: $REASON"
+            CHECK_CODE=1
+          fi
+          echo "reason=$REASON" >> "$GITHUB_OUTPUT"
+          exit "$CHECK_CODE"
+
+      - name: Escalate to Brian
+        if: ${{ !cancelled() && steps.outcome.outcome == 'failure' }}
+        env:
+          STAGE: ${{ inputs.stage }}
+          REASON: ${{ steps.outcome.outputs.reason }}
+          RESUME: ${{ inputs.resume }}
+          ASSIGNEE: ${{ steps.config.outputs.ESCALATION_ASSIGNEE }}
+          OUTPUT_FILE: ${{ runner.temp }}/persona-output.log
+        run: ./scripts/escalate-to-brian.sh
+
+      - name: Resolve earlier escalations for this story
+        if: steps.outcome.outcome == 'success'
+        continue-on-error: true
+        env:
+          STAGE: ${{ inputs.transition }}
+          ASSIGNEE: ${{ steps.config.outputs.ESCALATION_ASSIGNEE }}
+        run: ./scripts/escalate-to-brian.sh --resolve

@@ -13,7 +13,7 @@
 #
 # Called by:
 #   - .github/workflows/sync-blocked-labels.yml (issue events, manual dispatch)
-#   - .github/workflows/trigger-test-next-story.yml (story spec pushes to main)
+#   - scripts/transition.sh, from pipeline-main-and-merge.yml (story spec pushes to main)
 #
 # Usage: ./scripts/sync-blocked-labels.sh
 #

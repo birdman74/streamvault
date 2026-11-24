@@ -2,13 +2,13 @@
 # prerequisites. Fires on the issue events that can change blocked status:
 #   - a story issue is opened, or gets the 'story' label (new story)
 #   - a story issue closes or reopens (e.g. post-merge close by
-#     trigger-test-next-story.yml, a manual close, or a "not planned" close)
+#     pipeline-main-and-merge.yml, a manual close, or a "not planned" close)
 #   - manual dispatch (repair or audit, with optional dry run)
 #
 # Story spec changes pushed to main are handled by
-# trigger-test-next-story.yml, which already carries the ADR-002 push
-# guards and runs scripts/sync-blocked-labels.sh as a step. This workflow
-# has no push trigger, so ADR-002 does not apply to it.
+# pipeline-main-and-merge.yml, whose gate carries the ADR-002 push checks
+# and runs scripts/sync-blocked-labels.sh. This workflow has no push
+# trigger, so ADR-002 does not apply to it.
 #
 # Runs on a GitHub-hosted runner: it only needs checkout, gh and jq, and
 # must never wait in line behind a persona run on the self-hosted runner.
@@ -44,13 +44,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
 
       - name: Wait for GitHub API to reflect the issue change
         if: github.event_name == 'issues'
-        run: sleep 30
+        run: sleep "$(bash scripts/pipeline-config.sh get API_PROPAGATION_WAIT_SECONDS)"
 
       - name: Reconcile blocked labels
         env:

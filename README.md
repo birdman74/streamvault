@@ -28,7 +28,7 @@ Three Claude Code personas operate as scoped Docker containers with distinct Git
 
 For the full annotated workflow diagram including all GitHub Actions triggers, feedback loops, and escalation paths, see the [Agentic Workflow Diagram](https://github.com/birdman74/ai-dev-toolkit/blob/main/docs/agentic-workflow-diagram.md) in ai-dev-toolkit.
 
-Each step is triggered automatically by a GitHub Actions workflow. The self-hosted runner launches the appropriate persona container with a prompt. Brian's roles are spec approval, final PR review, and resolving design conflicts between Dev and Test when they cannot reach agreement after three rounds.
+Each hand-off is triggered automatically by a GitHub Actions workflow. Thin adapter workflows hand every event to one rules script (`scripts/transition.sh`), which decides whether a persona is needed, and one reusable workflow (`persona-run.yml`) launches it on the self-hosted runner, verifies the result, and escalates if it is missing. Personas settle disagreements directly: Dev and Test iterate on the design and on defective tests, and either can ask PO about acceptance criteria. Brian's roles are spec approval, final PR review, and `needs-brian` escalations when a loop exceeds its limit in `.github/pipeline-config.env` or a persona stalls (ADR-005).
 
 ### Personas
 
@@ -83,8 +83,9 @@ streamvault/
 │   │   └── design/             Test plans, API contracts, agreed designs
 │   └── adr/                    Architecture Decision Records
 ├── .claude/personas/           CLAUDE.md files for each persona
-├── .github/workflows/          GitHub Actions trigger chain
-├── scripts/                    Queue manager and utility scripts
+├── .github/workflows/          Pipeline adapters, reusable persona-run, CI, sync jobs
+├── .github/pipeline-config.env Every pipeline knob: limits, timing, accounts, board
+├── scripts/                    Hand-off rules (transition.sh), queue manager, checks
 ├── infrastructure/             Caddyfile and deployment config
 ├── CONTRIBUTING.md             Coding and testing standards
 └── STATUS.md                   Current project health and story status

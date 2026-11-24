@@ -27,6 +27,19 @@
 #   persona-outcome-check.sh verdict-count <pr-number> <iso-utc-time-or-empty> <login> <APPROVED|CHANGES_REQUESTED>
 #       Helper, not a check: prints how many verdict comments of that kind
 #       <login> posted at or after the given time (all time when empty).
+#   persona-outcome-check.sh files-touched <branch> <before-sha-or-empty> <extended-regex>
+#       A file whose path matches <extended-regex> changed on <branch> since
+#       <before-sha> (or since it forked from main, when empty).
+#   persona-outcome-check.sh pr-created-since <branch> <iso-utc-time>
+#       An open PR for <branch> was created at or after <iso-utc-time>.
+#   persona-outcome-check.sh changed-files <base-sha-or-ref> <head-sha-or-ref>
+#       Helper, not a check: prints the paths changed from the merge base of
+#       <base> to <head>, one per line (GitHub compare, all pages).
+#   persona-outcome-check.sh pr-number <branch>
+#       Helper, not a check: prints the open PR number for <branch>, or nothing.
+#   persona-outcome-check.sh latest-verdict <pr-number> <login>
+#       Helper, not a check: prints "<comment-id> <created-at> <VERDICT>" for
+#       the newest verdict comment by <login>, or nothing when there is none.
 #
 # Required env: GH_TOKEN, GH_REPO (owner/repo)
 #
@@ -44,6 +57,25 @@ if [ -z "$GH_REPO" ]; then
   echo "ERROR: GH_REPO must be set (owner/repo)" >&2
   exit 2
 fi
+
+# Resolves a branch name or SHA to a commit SHA (branch names contain '/',
+# which some endpoints do not accept as a ref)
+resolve_sha() {
+  local ref="$1"
+  if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "$ref"
+    return 0
+  fi
+  gh api "repos/$GH_REPO/git/ref/heads/$ref" --jq '.object.sha'
+}
+
+# Prints the paths changed from the merge base of <base> to <head>
+changed_files() {
+  local base_sha head_sha
+  base_sha=$(resolve_sha "$1") || return 2
+  head_sha=$(resolve_sha "$2") || return 2
+  gh api --paginate "repos/$GH_REPO/compare/${base_sha}...${head_sha}" --jq '.files[]?.filename'
+}
 
 # Prints how many PR comments by <login>, created at or after <since>,
 # contain <marker>. Paginated pages are summed.
@@ -145,6 +177,59 @@ case "$CHECK" in
     exit 0
     ;;
 
+  files-touched)
+    BRANCH="$1"
+    BEFORE_SHA="$2"
+    PATTERN="$3"
+    [ -z "$BRANCH" ] || [ -z "$PATTERN" ] && { echo "Usage: $0 files-touched <branch> <before-sha-or-empty> <extended-regex>" >&2; exit 2; }
+    CHANGED=$(changed_files "${BEFORE_SHA:-main}" "$BRANCH") || { echo "ERROR: could not compare ${BEFORE_SHA:-main} with $BRANCH" >&2; exit 2; }
+    MATCHED=$(echo "$CHANGED" | grep -E "$PATTERN" | head -5 | tr '\n' ' ')
+    if [ -n "$MATCHED" ]; then
+      echo "Changed on $BRANCH since ${BEFORE_SHA:-main}: $MATCHED"
+      exit 0
+    fi
+    echo "Nothing matching $PATTERN changed on $BRANCH since ${BEFORE_SHA:-main}"
+    exit 1
+    ;;
+
+  pr-created-since)
+    BRANCH="$1"
+    SINCE="$2"
+    [ -z "$BRANCH" ] || [ -z "$SINCE" ] && { echo "Usage: $0 pr-created-since <branch> <iso-utc-time>" >&2; exit 2; }
+    PR_CREATED=$(gh pr list --repo "$GH_REPO" --head "$BRANCH" --state open --json number,createdAt \
+      --jq '.[0] | if . then "\(.number) \(.createdAt)" else "" end') || { echo "ERROR: could not list PRs" >&2; exit 2; }
+    if [ -n "$PR_CREATED" ] && [[ "${PR_CREATED#* }" > "$SINCE" || "${PR_CREATED#* }" == "$SINCE" ]]; then
+      echo "Open PR #${PR_CREATED%% *} for $BRANCH was created at ${PR_CREATED#* }"
+      exit 0
+    fi
+    echo "No open PR for $BRANCH created since $SINCE"
+    exit 1
+    ;;
+
+  changed-files)
+    [ -z "$1" ] || [ -z "$2" ] && { echo "Usage: $0 changed-files <base> <head>" >&2; exit 2; }
+    changed_files "$1" "$2" || { echo "ERROR: could not compare $1 with $2" >&2; exit 2; }
+    exit 0
+    ;;
+
+  pr-number)
+    BRANCH="$1"
+    [ -z "$BRANCH" ] && { echo "Usage: $0 pr-number <branch>" >&2; exit 2; }
+    gh pr list --repo "$GH_REPO" --head "$BRANCH" --state open --json number --jq '.[0].number // ""' \
+      || { echo "ERROR: could not list PRs" >&2; exit 2; }
+    exit 0
+    ;;
+
+  latest-verdict)
+    PR_NUMBER="$1"
+    LOGIN="$2"
+    [ -z "$PR_NUMBER" ] || [ -z "$LOGIN" ] && { echo "Usage: $0 latest-verdict <pr-number> <login>" >&2; exit 2; }
+    gh api --paginate "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
+      --jq ".[] | select(.user.login == \"$LOGIN\" and (.body | test(\"<!-- test-verdict: (APPROVED|CHANGES_REQUESTED) -->\"))) | \"\(.id) \(.created_at) \(.body | capture(\"<!-- test-verdict: (?<v>APPROVED|CHANGES_REQUESTED) -->\").v)\"" \
+      | tail -1 || { echo "ERROR: could not read PR comments" >&2; exit 2; }
+    exit 0
+    ;;
+
   head-sha)
     BRANCH="$1"
     [ -z "$BRANCH" ] && { echo "Usage: $0 head-sha <branch>" >&2; exit 2; }
@@ -154,7 +239,7 @@ case "$CHECK" in
     ;;
 
   *)
-    echo "Unknown check '$CHECK'. Use: branch-created, file-on-branch, pr-open, branch-advanced, verdict-since, head-sha, verdict-count" >&2
+    echo "Unknown check '$CHECK'. Use: branch-created, file-on-branch, pr-open, branch-advanced, verdict-since, files-touched, pr-created-since, head-sha, verdict-count, changed-files, pr-number, latest-verdict" >&2
     exit 2
     ;;
 esac

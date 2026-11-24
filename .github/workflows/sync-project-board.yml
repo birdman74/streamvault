@@ -1,105 +1,74 @@
+# Keeps the StreamVault project board in step with each story issue.
+# Logic lives in scripts/sync-project-board.sh, which reads the issue's LIVE
+# state from the API, so a queued or out-of-order run can never move a
+# closed story back to Ready.
+#
+# Fires on every issue event that can change a story's column (including the
+# label edits made by sync-blocked-labels.yml and pipeline-main-and-merge.yml),
+# and on manual dispatch: one issue, or every story issue when the issue
+# number is left blank, with an optional dry run.
+#
+# Board, field and column names: .github/pipeline-config.env.
+# Token: PROJECT_BOARD_GH_TOKEN, a classic PAT from birdman74 with 'project'
+# and 'repo' scopes. GITHUB_TOKEN and fine-grained PATs cannot reach a
+# user-owned Projects V2 board (they silently find no item).
+#
+# No push trigger, so ADR-002 does not apply. Runs on a GitHub-hosted runner
+# so it never waits behind a persona run on the self-hosted runner.
 name: Sync Project Board Status
 
 on:
   issues:
-    types: [labeled, unlabeled, closed, reopened]
+    types: [opened, labeled, unlabeled, closed, reopened]
   workflow_dispatch:
     inputs:
       issue_number:
-        description: 'Issue number to sync'
-        required: true
+        description: 'Issue number to sync (leave blank to sync every story issue)'
+        required: false
+      dry_run:
+        description: 'Dry run: report moves only, change nothing'
+        type: boolean
+        required: false
+        default: false
+
+# One queue per issue: a newer event for the same issue replaces a pending
+# one (both read live state, so nothing is lost), and events for different
+# issues never cancel each other.
+concurrency:
+  group: sync-project-board-${{ github.event.issue.number || github.event.inputs.issue_number || 'all' }}
+  cancel-in-progress: false
 
 jobs:
   sync-board:
     permissions:
       contents: read
-      issues: read
     runs-on: ubuntu-latest
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event.issue != null && contains(github.event.issue.labels.*.name, 'story'))
+      contains(github.event.issue.labels.*.name, 'story')
 
     steps:
-      - name: Get issue number
-        id: issue
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "number=${{ github.event.inputs.issue_number }}" >> $GITHUB_OUTPUT
-          else
-            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
-          fi
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: main
 
-      - name: Get project item ID for issue
-        id: item
+      - name: Wait for GitHub API to reflect the issue change
+        if: github.event_name == 'issues'
+        run: sleep "$(bash scripts/pipeline-config.sh get API_PROPAGATION_WAIT_SECONDS)"
+
+      - name: Sync board
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PROJECT_BOARD_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+          DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && 'true' || 'false' }}
         run: |
-          ITEM_ID=$(gh api graphql -f query='
-          {
-            repository(owner: "birdman74", name: "streamvault") {
-              issue(number: ${{ steps.issue.outputs.number }}) {
-                projectItems(first: 5) {
-                  nodes {
-                    id
-                    project {
-                      id
-                    }
-                  }
-                }
-              }
-            }
-          }' --jq '.data.repository.issue.projectItems.nodes[] | select(.project.id == "PVT_kwHOAB-hm84Bh9Z8") | .id')
-          echo "item_id=$ITEM_ID" >> $GITHUB_OUTPUT
-          echo "Project item ID: $ITEM_ID"
-
-      - name: Determine target status
-        id: status
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # For manual dispatch, read current labels from API
-            LABELS=$(gh api repos/birdman74/streamvault/issues/${{ steps.issue.outputs.number }}/labels --jq '[.[].name]')
-            IS_CLOSED=$(gh api repos/birdman74/streamvault/issues/${{ steps.issue.outputs.number }} --jq '.state')
+          chmod +x scripts/*.sh
+          # Board title, Status field and column names come from the config
+          source scripts/pipeline-config.sh
+          if [ -n "$ISSUE_NUMBER" ]; then
+            ./scripts/sync-project-board.sh "$ISSUE_NUMBER"
           else
-            LABELS='${{ toJson(github.event.issue.labels.*.name) }}'
-            IS_CLOSED="${{ github.event.issue.state }}"
+            ./scripts/sync-project-board.sh --all
           fi
-
-          if [ "$IS_CLOSED" == "closed" ]; then
-            echo "option_id=98236657" >> $GITHUB_OUTPUT
-            echo "status=Done" >> $GITHUB_OUTPUT
-          elif echo "$LABELS" | grep -q "in-progress"; then
-            echo "option_id=47fc9ee4" >> $GITHUB_OUTPUT
-            echo "status=In Progress" >> $GITHUB_OUTPUT
-          elif echo "$LABELS" | grep -q "blocked"; then
-            echo "option_id=be85d1d9" >> $GITHUB_OUTPUT
-            echo "status=Backlog" >> $GITHUB_OUTPUT
-          else
-            echo "option_id=b633126c" >> $GITHUB_OUTPUT
-            echo "status=Ready" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Update project board status
-        if: steps.item.outputs.item_id != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api graphql -f query='
-          mutation {
-            updateProjectV2ItemFieldValue(
-              input: {
-                projectId: "PVT_kwHOAB-hm84Bh9Z8"
-                itemId: "${{ steps.item.outputs.item_id }}"
-                fieldId: "PVTSSF_lAHOAB-hm84Bh9Z8zhg3IUc"
-                value: {
-                  singleSelectOptionId: "${{ steps.status.outputs.option_id }}"
-                }
-              }
-            ) {
-              projectV2Item {
-                id
-              }
-            }
-          }'
-          echo "Moved issue #${{ steps.issue.outputs.number }} to ${{ steps.status.outputs.status }}"

@@ -1,7 +1,7 @@
 # ADR-004: Test Verdict Comment Is the Only Trigger for Dev Fixes
 
 **Date**: 2026-11-07
-**Status**: Accepted
+**Status**: Accepted (amended 2026-11-24 by ADR-005)
 **Deciders**: Brian Campbell
 
 ---
@@ -77,3 +77,9 @@ Under ADR-003, the Test final-review and re-verification launches must produce a
 **Have Test use a second GitHub account so it can submit formal reviews.** Rejected. It adds an account and a token to manage, and still needs a separate trigger for failures that come with no new commit.
 
 **Parse the prose "Recommendation: CHANGES REQUESTED" line instead of a marker.** Rejected. Prose drifts with wording and formatting, and a marker is unambiguous to both the persona and the workflow.
+
+---
+
+## Amendment 2026-11-24: ADR-005
+
+The verdict comment remains the only trigger for Dev fixes. It is handled by `pipeline-test-verdict.yml` (transition `dev-fix`), which also skips a verdict that is no longer the PR's latest or that Dev has already pushed a fix for. The cap is `DEV_FIX_ROUND_LIMIT` in `.github/pipeline-config.env`. A Dev push wakes Test only after a CHANGES_REQUESTED verdict, never before Test's first verdict. In Phase 4, Test lists review points no test can express under Non-testable review points instead of inventing tests, and every verdict lists spec changes made on the branch. See [ADR-005](ADR-005-pipeline-core-and-direct-persona-loops.md). The workflow names above are historical: the `trigger-*.yml` files were replaced by `scripts/transition.sh`, the reusable `persona-run.yml`, and six `pipeline-*.yml` adapters.

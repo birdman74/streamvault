@@ -1,7 +1,7 @@
 # ADR-003: Persona Outcome Verification and Escalation
 
 **Date**: 2026-11-07
-**Status**: Accepted
+**Status**: Accepted (amended 2026-11-24 by ADR-005)
 **Deciders**: Brian Campbell
 
 ---
@@ -74,3 +74,9 @@ The design-iteration-limit escalation in `trigger-dev-review.yml` and the fix-ro
 **Detect "NEEDS BRIAN" text in persona output.** Rejected as the trigger. Text matching misses crashes, timeouts, and personas that phrase the question differently. Checking for the expected artifact catches every kind of stall.
 
 **Fail the workflow run without opening an issue.** Rejected. Failed-run emails go to the user who triggered the run, which for persona pushes may be the bot, so the notification is not reliable.
+
+---
+
+## Amendment 2026-11-24: ADR-005
+
+Decisions 1 and 2 stand, now implemented once in `persona-run.yml`, with the expected outcome of each transition defined in `scripts/transition.sh verify` (which supersedes the table in Decision 1). Escalation issues now carry a "How to resume" row and close themselves when the story's next persona run succeeds. Decision 3's "Dev (stop)" rule is replaced: Dev reports a defective test to Test in `story-NNN-impl-feedback-rN.md` instead of stopping with NEEDS BRIAN. Round limits, the persona timeout and retry counts come from `.github/pipeline-config.env`. See [ADR-005](ADR-005-pipeline-core-and-direct-persona-loops.md). The workflow names above are historical: the `trigger-*.yml` files were replaced by `scripts/transition.sh`, the reusable `persona-run.yml`, and six `pipeline-*.yml` adapters.

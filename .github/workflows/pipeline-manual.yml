@@ -1,0 +1,116 @@
+# Manual restart of any hand-off: the "How to resume" line of every
+# needs-brian issue names the transition and inputs to use here. Manual runs
+# skip the author, state and round-limit checks (Brian is overriding), but the
+# persona's result is still verified and escalated.
+#
+# Thin adapter (ADR-005): a gate job on a GitHub-hosted runner reads the
+# event, and scripts/transition.sh (from main) decides whether a persona is
+# needed. The persona job calls persona-run.yml at @main, so everything but
+# this event wiring always comes from main.
+name: Pipeline - Manual Dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      transition:
+        description: 'Hand-off to run (see the needs-brian issue)'
+        type: choice
+        required: true
+        options:
+          - test-kickoff
+          - dev-design-review
+          - test-design-revision
+          - dev-implement
+          - test-impl-feedback
+          - test-final-review
+          - test-reverify
+          - dev-fix
+          - test-brian-review
+          - po-spec-revision
+          - po-clarify
+          - resume-after-po
+      story_id:
+        description: 'Story ID, e.g. story-009 (test-kickoff: leave blank to use the queue)'
+        required: false
+        default: ''
+      branch:
+        description: 'Feature branch (blank: found from story_id); not needed for po-spec-revision'
+        required: false
+        default: ''
+      pr_number:
+        description: 'PR number (blank: the open PR for the branch); required for po-spec-revision'
+        required: false
+        default: ''
+      round:
+        description: 'Round number (blank: worked out from the files on the branch)'
+        required: false
+        default: ''
+      mode:
+        description: 'dev-implement only: start (after agreement) or resume (after Test answered impl feedback)'
+        type: choice
+        required: false
+        default: start
+        options:
+          - start
+          - resume
+
+jobs:
+  gate:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.route.outputs.run }}
+      transition: ${{ steps.route.outputs.transition }}
+      persona: ${{ steps.route.outputs.persona }}
+      story_id: ${{ steps.route.outputs.story_id }}
+      branch: ${{ steps.route.outputs.branch }}
+      pr_number: ${{ steps.route.outputs.pr_number }}
+      round: ${{ steps.route.outputs.round }}
+      mode: ${{ steps.route.outputs.mode }}
+      ref_id: ${{ steps.route.outputs.ref_id }}
+      ref_time: ${{ steps.route.outputs.ref_time }}
+      stage: ${{ steps.route.outputs.stage }}
+      resume: ${{ steps.route.outputs.resume }}
+      prompt: ${{ steps.route.outputs.prompt }}
+    steps:
+      - name: Checkout pipeline scripts from main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Route event to a hand-off
+        id: route
+        env:
+          GH_TOKEN: ${{ secrets.STREAMVAULT_BOT_GH_TOKEN }}
+          QUEUE_GH_TOKEN: ${{ secrets.QUEUE_MANAGER_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          INPUT_TRANSITION: ${{ inputs.transition }}
+          INPUT_STORY_ID: ${{ inputs.story_id }}
+          INPUT_BRANCH: ${{ inputs.branch }}
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+          INPUT_ROUND: ${{ inputs.round }}
+          INPUT_MODE: ${{ inputs.mode }}
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/transition.sh route manual
+
+  persona:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    uses: birdman74/streamvault/.github/workflows/persona-run.yml@main
+    secrets: inherit
+    with:
+      transition: ${{ needs.gate.outputs.transition }}
+      persona: ${{ needs.gate.outputs.persona }}
+      story_id: ${{ needs.gate.outputs.story_id }}
+      branch: ${{ needs.gate.outputs.branch }}
+      pr_number: ${{ needs.gate.outputs.pr_number }}
+      round: ${{ needs.gate.outputs.round }}
+      mode: ${{ needs.gate.outputs.mode }}
+      ref_id: ${{ needs.gate.outputs.ref_id }}
+      ref_time: ${{ needs.gate.outputs.ref_time }}
+      stage: ${{ needs.gate.outputs.stage }}
+      resume: ${{ needs.gate.outputs.resume }}
+      prompt: ${{ needs.gate.outputs.prompt }}

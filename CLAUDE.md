@@ -1,4 +1,4 @@
-# StreamVault — Project Context
+# StreamVault - Project Context
 
 ## What Is StreamVault
 
@@ -8,16 +8,14 @@ StreamVault is a personal streaming library tracker that allows users to manage 
 
 | Layer | Technology |
 |---|---|
-| Backend | Java 25, Spring Boot 3.5.16, Spring AI |
+| Backend | Java 25, Spring Boot 3.5.16 |
 | Frontend | Next.js 14+, TypeScript |
 | Relational DB | PostgreSQL |
 | Document DB | MongoDB Atlas |
-| AI Gateway | LiteLLM |
-| Local Inference | Ollama |
-| Cloud Inference | AWS Bedrock |
 | Infrastructure | AWS EC2 (t3.micro), Docker, Docker Compose, Caddy |
-| Networking | Tailscale |
-| Spec Tooling | OpenSpec, OpenCode |
+| Specs | Written by the PO persona (Claude Code) in `docs/specs/` |
+
+Deferred, not yet used by the application (see [AI and Infrastructure Tooling](docs/specs/backlog.md#ai-and-infrastructure-tooling)): Spring AI, LiteLLM (AI gateway; local container only), Ollama (local inference), AWS Bedrock (cloud inference), Tailscale (private networking). Do not add code that depends on them.
 
 ## Repository Structure
 
@@ -30,8 +28,12 @@ streamvault/
 |    |- ec2/
 |    |- litellm-config.yml
 |- docs/
-|    |- specs/          # OpenSpec output lives here
+|    |- specs/          # Epics, stories, backlog (PO); design/ and status/ per story
 |    |- adr/            # Architecture Decision Records
+|- .github/
+|    |- workflows/      # Pipeline adapters, reusable persona-run, CI, sync jobs
+|    |- pipeline-config.env  # Every pipeline knob (ADR-005)
+|- scripts/            # Pipeline rules (transition.sh), queue, checks
 |- .claude/
 |    |- personas/
 |         |- po/CLAUDE.md
@@ -40,6 +42,8 @@ streamvault/
 |- docker-compose.yml
 |- .env.example
 |- CLAUDE.md            # this file
+|- CONTRIBUTING.md      # Conventions, ADR index
+|- STATUS.md            # Project dashboard
 ```
 
 ## Coding Conventions
@@ -47,7 +51,7 @@ streamvault/
 - Language: Java is the primary backend language
 - Iteration variables in order: i, j, k, l
 - No em-dashes in any output or documentation
-- All credentials via .env file only — never hardcoded in committed files
+- Credentials only in gitignored .env files or GitHub Actions secrets, never hardcoded in committed files
 - Use ${VAR} references in all committed config files
 - Line endings: LF (enforced via .gitattributes)
 - Branch: main
@@ -55,14 +59,18 @@ streamvault/
 
 ## Agent Workflow
 
-This project uses a multi-persona agentic workflow:
+This project uses a multi-persona, test-first agentic workflow. Your own persona file (`~/.claude/CLAUDE.md`) holds your detailed instructions; this is the overview.
 
-1. PO persona defines epics and user stories with acceptance criteria
-2. Dev persona implements against those stories
-3. Test persona writes and runs tests against the implementation
-4. Brian (human) reviews and approves before anything merges to main
+1. PO defines epics and user stories with acceptance criteria; Brian reviews and merges the specs
+2. Test goes first: test plan, API contracts and failing tests for the story
+3. Dev reviews Test's design; they iterate until Dev agrees
+4. Dev implements until every test passes and opens a PR
+5. Test verifies and posts a verdict; Dev fixes until Test approves
+6. Brian reviews and merges
 
-Each persona operates in its own Docker container with a scoped Git identity. No persona merges to main directly — all work goes through Brian's review.
+Personas settle disagreements directly (design feedback, defective tests, and acceptance-criteria questions to PO), each within a round limit in `.github/pipeline-config.env`. Brian is pulled in through a `needs-brian` issue only when a limit is exceeded or a persona stalls (ADR-005).
+
+Each persona operates in its own Docker container with a scoped Git identity. No persona merges to main directly; all work goes through Brian's review.
 
 ## Git Identity Per Persona
 

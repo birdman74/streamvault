@@ -1,6 +1,6 @@
 # Backlog / Deferred Work
 
-Placeholders for work explicitly identified but deferred out of an active epic's scope. These are not yet specced as epics or stories — they're parking spots so the context isn't lost. Pull from this list when scoping future epics.
+Placeholders for work explicitly identified but deferred out of an active epic's scope. These are not yet specced as epics or stories: they're parking spots so the context isn't lost. Pull from this list when scoping future epics.
 
 ## Account Settings (deferred from Epic: User Authentication, 2026-08-11)
 Change password, delete account, update profile/email. Deferred because STORY-001/STORY-002 cover registration and login only; account management is a separate concern.
@@ -47,3 +47,25 @@ STORY-006 deliberately narrows TMDB search and browse to movie and TV series res
 - Keyword search (TMDB's controlled tag vocabulary, for example "based on novel", "dystopia"). Value: thematic discovery beyond free-text title matching.
 
 None of these change what STORY-006 delivers. Pull from this list only when a concrete feature needs one of them; do not spec them speculatively.
+
+## AI and Infrastructure Tooling
+
+Tools named in the original StreamVault stack plan (see `ai-dev-toolkit` DEVLOG, Phase 0) that are not yet used by the application. Each entry records why it is deferred and what should trigger the work. When one is pulled, spec it as an infrastructure story (assignee: Brian, like STORY-003 and STORY-004) or as the enabling first story of a feature epic.
+
+### Spring AI (deferred, 2026-11-26)
+Listed as the backend AI layer, but no AI feature exists yet, so it is not in `pom.xml`. Trigger: the first feature that needs an LLM (for example recommendations, natural-language library search, or summarizing a user's notes). Scope: add Spring AI, wire it to the AI gateway below, and prove it with one real feature behind a story with acceptance criteria. Why it matters: demonstrates the Java-native AI integration that enterprise Java teams are adopting.
+
+### LiteLLM AI Gateway (partially in place, deferred from EC2, 2026-11-26)
+A LiteLLM container is defined in the local `docker-compose.yml` with `infrastructure/litellm-config.yml`, but no application code calls it, and it is deliberately excluded from `docker-compose.prod.yml` because the t3.micro (1 GB RAM) cannot run it next to Spring Boot. Trigger: the Spring AI story above, or an EC2 instance upgrade. Scope: route Spring AI through LiteLLM so application code never changes between local and cloud models; decide the production host (larger instance, or a managed alternative) and its cost.
+
+### Ollama Local Inference (blocked, 2026-11-26)
+Free local inference for development. Blocked: the AMD RX 7600 XT on WSL2 Docker needs DirectML, which Ollama does not support, and CPU-only inference is too slow. Trigger: a supported GPU path (ROCm on WSL2 or native), different hardware, or API costs becoming a concern. Scope: run Ollama locally behind LiteLLM and confirm the Spring AI feature works against it.
+
+### AWS Bedrock Cloud Inference (deferred, 2026-11-26)
+Intended for production demos through LiteLLM. Not set up: no AWS Bedrock model access, IAM policy, or LiteLLM route exists yet. Trigger: the first AI feature is ready to demo from EC2. Scope: request model access, add a least-privilege IAM role for the instance, add the LiteLLM route, and set a budget alarm, since AWS free tier has expired.
+
+### Tailscale Private Network (parked, 2026-11-26)
+Would let the EC2 app reach local Ollama without public exposure. Only useful once Ollama works and a cloud-deployed feature needs local inference. Trigger: Ollama unblocked. Scope: tailnet with the EC2 instance and the local machine, ACLs limited to the LiteLLM port.
+
+### Spec-Driven Development Tooling: OpenSpec and OpenCode (evaluation, 2026-11-26)
+Planned in Phase 0 as the spec-driven development framework but never adopted: specs are written by the PO persona in Claude Code, following its CLAUDE.md, with acceptance criteria labeled AC-N and prerequisites the queue parses. Scope: evaluate whether OpenSpec (and OpenCode) would improve on that, comparing spec format, change tracking, how Test and Dev consume specs, and fit with the pipeline's file conventions (`docs/specs/story-NNN-*.md`, `## Prerequisites`, AC-N). Outcome: an ADR either adopting one (with a migration plan for PO's CLAUDE.md and the queue scripts) or recording why the current approach stays.

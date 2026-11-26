@@ -60,13 +60,15 @@ queue manager picking up next story.
 - [x] GitHub Actions workflow: build on push to main
 
 ### Agentic Workflow Infrastructure
-- [x] Claude Code Docker image built (`claude-experience-img`)
-- [x] PO persona container configured (`streamvault-po.sh`)
-- [x] Dev persona container configured (`streamvault-dev.sh`)
-- [x] Test persona container configured (`streamvault-test.sh`)
+- [x] Persona images built (`claude-base-img`, `claude-po-img`, `claude-dev-img` for Dev and Test)
+- [x] PO, Dev and Test persona containers configured (interactive `streamvault-<persona>.sh`, automated `streamvault-<persona>-auto.sh`)
 - [x] Shared GitHub deploy key generated and registered
 - [x] Per-persona Git identity configured
 - [x] CLAUDE.md files in place (project root + all 3 personas)
+- [x] Self-hosted GitHub Actions runner launching personas automatically
+- [x] Story queue on GitHub Issues with prerequisite-based `blocked` labels and project board sync
+- [x] Persona outcome verification and `needs-brian` escalation (ADR-003); Test verdict comments trigger Dev fixes (ADR-004)
+- [x] Pipeline core: `scripts/transition.sh`, reusable `persona-run.yml`, six `pipeline-*.yml` adapters, all knobs in `.github/pipeline-config.env`, direct persona loops (ADR-005)
 
 ---
 
@@ -132,16 +134,13 @@ N/A
 
 | Layer | Technology |
 |---|---|
-| Backend | Java 25, Spring Boot 3.5.16, Spring AI |
+| Backend | Java 25, Spring Boot 3.5.16 |
 | Frontend | Next.js 14+, TypeScript |
 | Relational DB | PostgreSQL |
 | Document DB | MongoDB Atlas (M0 free tier) |
-| AI Gateway | LiteLLM |
-| Local Inference | Ollama |
-| Cloud Inference | AWS Bedrock |
 | Infrastructure | AWS EC2 t3.micro, Docker, Docker Compose, Caddy |
-| Networking | Tailscale |
-| Spec Tooling | OpenSpec, OpenCode |
+| Specs | Written by the PO persona (Claude Code) in `docs/specs/` |
+| Deferred | Spring AI, LiteLLM, Ollama, AWS Bedrock, Tailscale (see [backlog](docs/specs/backlog.md#ai-and-infrastructure-tooling)) |
 
 ---
 
@@ -165,7 +164,8 @@ N/A
 | LiteLLM as AI gateway | Provider-agnostic routing so application code never changes when switching between Ollama (free local dev) and AWS Bedrock (production demos) |
 | LiteLLM deferred from EC2 | t3.micro has 1GB RAM; LiteLLM consumed ~500MB leaving insufficient headroom for Spring Boot. Will revisit on instance upgrade. |
 | Spring AI over direct SDK | First-class Java abstraction for AI that enterprise Java shops are adopting; demonstrates modern Java AI integration patterns |
-| Single Claude Code image, three personas | Tooling needs are identical across personas; behavior is driven entirely by CLAUDE.md system prompts |
+| Three persona images, behavior from CLAUDE.md | `claude-base-img` (Claude Code + git), `claude-po-img` (+ gh), `claude-dev-img` (+ Java 25, Maven, gh; shared by Dev and Test). Behavior is driven entirely by each persona's CLAUDE.md |
 | All Rights Reserved license | Portfolio repo must be publicly visible for recruiters while protecting original work |
 | Ollama deferred (local) | AMD RX 7600 XT GPU passthrough to Docker on WSL2/Windows uses DirectML which Ollama does not support. CPU-only inference is too slow for practical use. LiteLLM will route to Claude API during development and AWS Bedrock for production demos. Will revisit if Claude Pro quota or API costs become a concern. |
+| Pipeline rules in one script, knobs in one file (ADR-005) | Every hand-off rule lives in `scripts/transition.sh` and runs from main via the reusable `persona-run.yml`; every limit, timeout and account name lives in `.github/pipeline-config.env`. Personas settle disagreements directly within round limits; Brian is escalated to only past a limit (2026-11-24) |
 | STATUS.md is a dashboard, not a log | Story-by-story phase narrative, regression analysis, and deviation notes moved to per-story log files under `docs/specs/status/`, so STATUS.md stays a fast, current at-a-glance view while the detailed trace Brian relies on for PR review is preserved and scoped to one story at a time (2026-09-10) |

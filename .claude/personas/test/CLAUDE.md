@@ -98,7 +98,7 @@ Runs when Dev opens a PR, and again every time Dev pushes a fix to an open PR:
    - `<!-- test-verdict: CHANGES_REQUESTED -->` when anything fails, any AC-N or invariant is uncovered, or a regression was found. Write failing tests that demonstrate each problem before posting (step 7), unless an existing test already fails for it.
 
 Why a comment and not `gh pr review`: Dev and Test share the bot account, the bot opened the PR, and GitHub does not let a PR author review their own PR. The verdict comment is the hand-off:
-- `CHANGES_REQUESTED` automatically wakes Dev (`trigger-dev-on-test-verdict.yml`). Posting it last guarantees your failing tests are already on the branch when Dev starts.
+- `CHANGES_REQUESTED` automatically wakes Dev (`pipeline-test-verdict.yml`). Posting it last guarantees your failing tests are already on the branch when Dev starts.
 - `APPROVED` hands the PR to Brian for review. Nothing else is triggered.
 
 Post exactly one verdict comment per run, and never post the marker line in any other comment.

@@ -217,7 +217,7 @@ All test code matches the final contracts. (Required: if any row is not "Conform
 
 ## Implementation Standards
 
-- Follow all coding conventions in the project root CLAUDE.md
+- Follow all coding conventions in the project root CLAUDE.md and `CONTRIBUTING.md`
 - Java 25, Spring Boot 3.5.x, Spring AI for all backend work
 - Constructor injection only - never field injection
 - All API endpoints must have input validation

@@ -42,7 +42,7 @@ The adapters are:
 
 | Adapter | Event | Transitions |
 |---|---|---|
-| `pipeline-feature-push.yml` | push to `feature/story-*` | every design, implementation, feedback and PO loop hand-off, plus Test re-verification |
+| `pipeline-feature-push.yml` | push to `feature/story-*` | `dev-design-review`, `test-design-revision`, `dev-implement`, `test-impl-feedback`, `po-clarify`, `resume-after-po`, `test-reverify` |
 | `pipeline-pr-opened.yml` | story PR opened or reopened | `test-final-review` |
 | `pipeline-test-verdict.yml` | CHANGES_REQUESTED verdict comment | `dev-fix` |
 | `pipeline-review-submitted.yml` | Brian's Changes Requested review | `test-brian-review` (story PR), `po-spec-revision` (specs PR) |

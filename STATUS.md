@@ -106,7 +106,7 @@ Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the q
 - [x] STORY-006: TMDB Search and Browse (`docs/specs/story-006-tmdb-search-browse.md`) - Completed - Full trace: `docs/specs/status/story-006-log.md`
 - [x] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Completed - Full trace: `docs/specs/status/story-007-log.md`
 - [x] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006 - Completed - Full trace: `docs/specs/status/story-008-log.md`
-- [ ] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008 - Test APPROVED on PR #31, awaiting Brian's review - Full trace: `docs/specs/status/story-009-log.md`
+- [x] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008 - Completed - Full trace: `docs/specs/status/story-009-log.md`
 - [ ] STORY-010: Set Movie Watch Status (`docs/specs/story-010-set-movie-watch-status.md`) - prereq STORY-007
 - [ ] STORY-011: Remove Item from Library (`docs/specs/story-011-remove-library-item.md`) - prereq STORY-007, STORY-008
 - [ ] STORY-012: Series Progress by Episode with Season and Series Roll-Up (`docs/specs/story-012-series-episode-status-rollup.md`) - prereq STORY-008

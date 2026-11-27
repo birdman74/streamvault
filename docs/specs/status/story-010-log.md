@@ -9,6 +9,34 @@ Branch: `feature/story-010-set-movie-watch-status`
 
 ---
 
+## Phase 1: Dev design review, round 1 (2026-11-27)
+
+Agreed after round 1 - no feedback round needed. Read the story, the test plan, the API contracts,
+and ran the Test Code Conformance check against all eight test files Test committed
+(`LibraryEndpointsSecurityTest`, `LibraryMovieControllerPrincipalConventionTest`,
+`LibraryMovieControllerTest`, `LibraryMovieRepositoryTest`, `LibraryMovieServiceTest`,
+`LibraryMovieTest`, `UpdateMovieStatusRequestValidationTest`, `LibraryMovieNotFoundExceptionTest`),
+cross-checked against the current committed production code (`LibraryMovie`,
+`LibraryMovieRepository`, `LibraryMovieService`, `LibraryMovieController`, `LibraryMovieResponse`,
+`WatchStatus`, `InvalidWatchStatusException`, `GlobalExceptionHandler`) rather than the contract
+prose alone. Every constructor, method signature, endpoint, DTO field, status code, and error
+message used in the tests matches the final `story-010-api-contracts.md`. Independently reran
+`mvn test-compile` and confirmed the expected RED state matches Test's claim exactly: only the seven
+files that reference the five unimplemented symbols (`updateStatus`, `findByIdAndUserId`,
+`setStatus`, `UpdateMovieStatusRequest`, `LibraryMovieNotFoundException`) fail to compile;
+`LibraryEndpointsSecurityTest` compiles clean as claimed.
+
+One non-blocking documentation note: `story-010-test-plan.md`'s AC coverage table names a class
+`LibraryMovieEndpointsSecurityTest` that does not exist - the actual (and correctly named, per the
+story-010 log's own Phase 1 entry) file is `LibraryEndpointsSecurityTest`, the same class story-007
+already owns. This is a naming slip in the traceability table only; the committed test code itself
+is correct and matches the contracts, so it does not block agreement.
+
+No test/contract mismatches found. No acceptance-criteria ambiguity found. Agreed design committed
+to `story-010-agreed.md`; proceeding to Phase 2 implementation.
+
+---
+
 ## Phase 1: Test goes first (2026-11-27)
 
 Complete on branch `feature/story-010-set-movie-watch-status`, cut from `main` after STORY-009

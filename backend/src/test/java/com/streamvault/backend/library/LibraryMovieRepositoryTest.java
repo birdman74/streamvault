@@ -137,4 +137,47 @@ class LibraryMovieRepositoryTest {
 
         assertThat(found).extracting(LibraryMovie::getTitle).containsExactly("Inception");
     }
+
+    /*
+     * Contract lives in docs/specs/design/story-010-api-contracts.md. findByIdAndUserId does not
+     * exist yet; these methods are expected to fail to compile until Dev implements it.
+     */
+
+    @Test
+    void should_returnEmptyOptional_when_findByIdAndUserIdMatchesNoRow() {
+        assertThat(libraryMovieRepository.findByIdAndUserId(999_999L, userA)).isEmpty();
+    }
+
+    @Test
+    void should_returnEmptyOptional_when_findByIdAndUserIdMatchesAnIdButADifferentUser() {
+        LibraryMovie saved = libraryMovieRepository.save(new LibraryMovie(userA, 27205L, "Inception",
+                2010, null, WatchStatus.PLANNED));
+
+        assertThat(libraryMovieRepository.findByIdAndUserId(saved.getId(), userB)).isEmpty();
+    }
+
+    @Test
+    void should_findTheRow_when_findByIdAndUserIdMatchesBothTheIdAndTheOwningUser() {
+        LibraryMovie saved = libraryMovieRepository.save(new LibraryMovie(userA, 27205L, "Inception",
+                2010, null, WatchStatus.PLANNED));
+
+        Optional<LibraryMovie> found = libraryMovieRepository.findByIdAndUserId(saved.getId(), userA);
+
+        assertThat(found).isPresent();
+        assertThat(found.get().getTitle()).isEqualTo("Inception");
+    }
+
+    @Test
+    void should_roundTripAnUpdatedStatus_when_savedAfterSetStatus() {
+        LibraryMovie saved = libraryMovieRepository.save(new LibraryMovie(userA, 27205L, "Inception",
+                2010, null, WatchStatus.PLANNED));
+
+        saved.setStatus(WatchStatus.WATCHED);
+        libraryMovieRepository.save(saved);
+
+        Optional<LibraryMovie> found = libraryMovieRepository.findByIdAndUserId(saved.getId(), userA);
+
+        assertThat(found).isPresent();
+        assertThat(found.get().getStatus()).isEqualTo(WatchStatus.WATCHED);
+    }
 }

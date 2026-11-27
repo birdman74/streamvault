@@ -52,11 +52,27 @@ class LibraryMovieTest {
         assertThat(Modifier.isProtected(constructor.getModifiers())).isTrue();
     }
 
+    /*
+     * Contract lives in docs/specs/design/story-010-api-contracts.md. Revises the original
+     * should_exposeGettersOnlyAndNoSetters assertion: STORY-010 adds setStatus as the one
+     * mutator this entity needs (AC-1, AC-3), so "no setters at all" no longer holds. The
+     * narrower assertion below preserves the original invariant's intent - no uncontrolled
+     * field mutation - by pinning setStatus as the *only* set*-prefixed method.
+     */
     @Test
-    void should_exposeGettersOnlyAndNoSetters() {
+    void should_exposeGettersAndOnlyTheStatusMutator_when_methodsAreInspected() {
         assertThat(Arrays.stream(LibraryMovie.class.getDeclaredMethods())
                 .map(Method::getName)
                 .filter(name -> name.startsWith("set")))
-                .isEmpty();
+                .containsExactly("setStatus");
+    }
+
+    @Test
+    void should_updateStatus_when_setStatusIsCalled() {
+        LibraryMovie movie = new LibraryMovie(1L, 27205L, "Inception", 2010, null, WatchStatus.PLANNED);
+
+        movie.setStatus(WatchStatus.WATCHED);
+
+        assertThat(movie.getStatus()).isEqualTo(WatchStatus.WATCHED);
     }
 }

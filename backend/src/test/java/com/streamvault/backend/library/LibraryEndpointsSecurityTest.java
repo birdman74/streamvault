@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -214,5 +215,132 @@ class LibraryEndpointsSecurityTest {
         mockMvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("library-me-unaffected@example.com"));
+    }
+
+    /*
+     * Contract lives in docs/specs/design/story-010-api-contracts.md. The PATCH
+     * /api/library/movies/{id}/status route does not exist yet; these methods are expected to
+     * fail to compile/run until Dev implements it.
+     */
+
+    private long addMovie(String token, long tmdbId, String status) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/library/movies")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"tmdbId\":" + tmdbId + (status == null ? "" : ",\"status\":\"" + status + "\"") + "}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
+    }
+
+    @Test
+    void should_return401_when_updateStatusIsCalledWithoutAuthentication() throws Exception {
+        mockMvc.perform(patch("/api/library/movies/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"WATCHED\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().json("{\"error\":\"Authentication required\"}"));
+    }
+
+    @Test
+    void should_updateStatusEndToEnd_when_aValidStatusIsSubmitted() throws Exception {
+        String token = registerAndLogin("library-status-update@example.com");
+        stubInception();
+        long movieId = addMovie(token, INCEPTION_ID, null);
+
+        mockMvc.perform(patch("/api/library/movies/" + movieId + "/status")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"WATCHED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(movieId))
+                .andExpect(jsonPath("$.status").value("WATCHED"));
+    }
+
+    @Test
+    void should_reflectTheNewStatus_when_libraryListIsFetchedAfterAnUpdate() throws Exception {
+        String token = registerAndLogin("library-status-list@example.com");
+        stubInception();
+        long movieId = addMovie(token, INCEPTION_ID, null);
+
+        mockMvc.perform(patch("/api/library/movies/" + movieId + "/status")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CURRENTLY_WATCHING\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/library").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(movieId))
+                .andExpect(jsonPath("$.items[0].status").value("CURRENTLY_WATCHING"));
+    }
+
+    @Test
+    void should_allowWatchedBackToPlanned_when_statusIsChangedTwiceEndToEnd() throws Exception {
+        String token = registerAndLogin("library-status-roundtrip@example.com");
+        stubInception();
+        long movieId = addMovie(token, INCEPTION_ID, null);
+
+        mockMvc.perform(patch("/api/library/movies/" + movieId + "/status")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"WATCHED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("WATCHED"));
+
+        mockMvc.perform(patch("/api/library/movies/" + movieId + "/status")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"PLANNED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PLANNED"));
+    }
+
+    @Test
+    void should_leaveStatusUnchanged_when_anInvalidStatusValueIsSubmittedEndToEnd() throws Exception {
+        String token = registerAndLogin("library-status-invalid@example.com");
+        stubInception();
+        long movieId = addMovie(token, INCEPTION_ID, "PLANNED");
+
+        mockMvc.perform(patch("/api/library/movies/" + movieId + "/status")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"SOON\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/library").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].status").value("PLANNED"));
+    }
+
+    @Test
+    void should_return404AndChangeNothing_when_aUserTriesToUpdateAnotherUsersMovie() throws Exception {
+        String tokenA = registerAndLogin("library-status-owner@example.com");
+        String tokenB = registerAndLogin("library-status-intruder@example.com");
+        stubInception();
+        long movieId = addMovie(tokenA, INCEPTION_ID, "PLANNED");
+
+        mockMvc.perform(patch("/api/library/movies/" + movieId + "/status")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenB)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"WATCHED\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("This movie is not in your library."));
+
+        mockMvc.perform(get("/api/library").header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].status").value("PLANNED"));
+    }
+
+    @Test
+    void should_return404_when_updatingStatusOfANonexistentLibraryMovie() throws Exception {
+        String token = registerAndLogin("library-status-missing@example.com");
+
+        mockMvc.perform(patch("/api/library/movies/999999/status")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"WATCHED\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("This movie is not in your library."));
     }
 }

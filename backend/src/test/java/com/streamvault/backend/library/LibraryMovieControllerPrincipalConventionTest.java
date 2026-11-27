@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -91,5 +92,40 @@ class LibraryMovieControllerPrincipalConventionTest {
 
         verify(libraryMovieService).addMovie(eq(7L), eq(27205L), isNull());
         verify(libraryMovieService, org.mockito.Mockito.never()).addMovie(eq(999L), any(), any());
+    }
+
+    /*
+     * Contract lives in docs/specs/design/story-010-api-contracts.md. updateStatus and
+     * UpdateMovieStatusRequest do not exist yet; these methods are expected to fail to compile
+     * until Dev implements them.
+     */
+
+    @Test
+    @WithMockAuthenticatedUser(userId = 42L, email = "user@example.com")
+    void should_threadResolvedPrincipalUserIdIntoUpdateStatus_when_statusIsChanged() throws Exception {
+        when(libraryMovieService.updateStatus(eq(42L), eq(1L), eq("WATCHED")))
+                .thenReturn(response("WATCHED"));
+
+        mockMvc.perform(patch("/api/library/movies/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"WATCHED\"}"))
+                .andExpect(status().isOk());
+
+        verify(libraryMovieService).updateStatus(eq(42L), eq(1L), eq("WATCHED"));
+    }
+
+    @Test
+    @WithMockAuthenticatedUser(userId = 7L, email = "someone-else@example.com")
+    void should_useADifferentPrincipalUserId_when_aDifferentUserChangesStatus() throws Exception {
+        when(libraryMovieService.updateStatus(eq(7L), eq(1L), eq("WATCHED")))
+                .thenReturn(response("WATCHED"));
+
+        mockMvc.perform(patch("/api/library/movies/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"WATCHED\"}"))
+                .andExpect(status().isOk());
+
+        verify(libraryMovieService).updateStatus(eq(7L), eq(1L), eq("WATCHED"));
+        verify(libraryMovieService, org.mockito.Mockito.never()).updateStatus(eq(42L), any(), any());
     }
 }

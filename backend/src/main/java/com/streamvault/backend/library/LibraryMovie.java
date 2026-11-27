@@ -20,8 +20,10 @@ import jakarta.persistence.Table;
  * (AC-4); the entity carries no {@code unique=true} of its own but must still match the columns so
  * {@code spring.jpa.hibernate.ddl-auto=validate} passes on a full context load.
  *
- * <p>Getters only, no setters: this story sets every field once at construction. The public
- * constructor stamps {@code addedAt}; the {@code protected} no-arg constructor exists for JPA.
+ * <p>Getters and exactly one mutator: every field except {@code status} is set once at
+ * construction. {@code setStatus} is the one controlled mutation this entity allows (STORY-010,
+ * AC-1/AC-3). The public constructor stamps {@code addedAt}; the {@code protected} no-arg
+ * constructor exists for JPA.
  */
 @Entity
 @Table(name = "library_movies")
@@ -97,5 +99,9 @@ public class LibraryMovie {
 
     public Instant getAddedAt() {
         return addedAt;
+    }
+
+    public void setStatus(WatchStatus status) {
+        this.status = status;
     }
 }

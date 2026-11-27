@@ -1,0 +1,222 @@
+# STORY-010 Log: Set Movie Watch Status
+
+> Full phase-by-phase trace of Dev/Test work on this story. STATUS.md carries only a
+> one-line current status for this story; this file is the detailed record used during
+> PR review. Newest entries at the top.
+
+Spec: `docs/specs/story-010-set-movie-watch-status.md`
+Branch: `feature/story-010-set-movie-watch-status`
+
+---
+
+## Phase 3: Test PR verification (2026-11-27)
+
+**Verdict: APPROVED** (PR #32)
+
+Pulled `feature/story-010-set-movie-watch-status` (already up to date with origin), ran
+`mvn clean verify`: BUILD SUCCESS, 420 tests run across the full suite, 0 failures, 0 errors, 0
+skipped. This matches Dev's Phase 2 claim exactly - no drift between Dev's local run and this
+re-verification.
+
+### Acceptance Criteria Coverage
+Checked every AC-1..AC-6 test named in `story-010-test-plan.md` against the actual committed test
+files (not just the table) and confirmed each one exists, compiles, and passed in the run above:
+- AC-1: `LibraryMovieServiceTest.should_updateStoredStatus_when_statusIsSetTo` (all three values),
+  `LibraryMovieControllerTest.should_return200WithTheUpdatedEntry_when_statusIsChanged`,
+  `LibraryEndpointsSecurityTest.should_updateStatusEndToEnd_when_aValidStatusIsSubmitted`
+- AC-2: `LibraryMovieServiceTest.should_persistStatusChange_when_readBackAfterUpdate`,
+  `LibraryMovieRepositoryTest.should_roundTripAnUpdatedStatus_when_savedAfterSetStatus`,
+  `LibraryEndpointsSecurityTest.should_reflectTheNewStatus_when_libraryListIsFetchedAfterAnUpdate`
+- AC-3: `LibraryMovieServiceTest.should_allowAnyNumberOfTransitionsInAnyDirection_when_statusIsChangedRepeatedly`,
+  `LibraryEndpointsSecurityTest.should_allowWatchedBackToPlanned_when_statusIsChangedTwiceEndToEnd`
+- AC-4: `LibraryMovieServiceTest.should_throwInvalidWatchStatusException_when_updateStatusValueIsNotARecognizedValue`
+  / `...ValueDiffersOnlyInCase` / `should_leaveStoredStatusUnchanged_when_updateStatusValueIsInvalid`,
+  `LibraryMovieControllerTest.should_return400WithClearMessage_when_updateStatusIsUnsupported`,
+  `UpdateMovieStatusRequestValidationTest.should_rejectRequest_when_statusIsBlank` / `...IsNull`,
+  `LibraryEndpointsSecurityTest.should_leaveStatusUnchanged_when_anInvalidStatusValueIsSubmittedEndToEnd`
+- AC-5: `LibraryMovieRepositoryTest.should_notFindAnotherUsersMovie_when_updatingByIdAndUserId` (named
+  `should_returnEmptyOptional_when_findByIdAndUserIdMatchesAnIdButADifferentUser` in the committed
+  file - same naming slip as the test-plan table, not a coverage gap),
+  `LibraryMovieServiceTest.should_throwLibraryMovieNotFoundException_when_theItemBelongsToAnotherUser`
+  / `should_notSaveAnything_when_theItemBelongsToAnotherUser`,
+  `LibraryEndpointsSecurityTest.should_return404AndChangeNothing_when_aUserTriesToUpdateAnotherUsersMovie`
+- AC-6: `LibraryMovieServiceTest.should_throwLibraryMovieNotFoundException_when_noMovieMatchesTheIdForThatUser`,
+  `LibraryMovieControllerTest.should_return404WithClearMessage_when_updateStatusTargetsAMovieNotInTheLibrary`,
+  `LibraryMovieNotFoundExceptionTest.should_carryTheFixedUserFacingMessage_when_constructed`,
+  `LibraryEndpointsSecurityTest.should_return404_when_updatingStatusOfANonexistentLibraryMovie`
+
+All four cross-story invariants from the test plan also confirmed passing: repository
+empty-without-throwing (`LibraryMovieRepositoryTest`), entity's single-mutator invariant
+(`LibraryMovieTest.should_exposeGettersAndOnlyTheStatusMutator_when_methodsAreInspected`), the
+`authenticated()` boundary (`LibraryEndpointsSecurityTest.should_return401_when_updateStatusIsCalledWithoutAuthentication`),
+and principal-sourced user id threading (`LibraryMovieControllerPrincipalConventionTest`, two
+methods).
+
+### Regression Analysis
+Diffed `main...HEAD`: implementation touches `GlobalExceptionHandler`, `LibraryMovie`,
+`LibraryMovieController`, `LibraryMovieRepository`, `LibraryMovieService` (all shared), plus two new
+files (`UpdateMovieStatusRequest`, `LibraryMovieNotFoundException`). Every change is additive:
+- `GlobalExceptionHandler`: one new `@ExceptionHandler` method added; no existing handler body
+  changed. Every other exception-mapping test (auth, settings, tmdb) still green in the same run.
+- `LibraryMovie`: one new `setStatus` mutator added; no existing field, constructor, or getter
+  touched. `LibraryMovieTest`'s revised invariant test (agreed in Phase 1/2) pins this as the *only*
+  mutator, so a future story adding an uncontrolled setter would fail this test first.
+- `LibraryMovieRepository`: one new finder method (`findByIdAndUserId`), no change to
+  `findByUserIdAndTmdbId` or `findByUserId`. `LibraryMovieRepositoryTest`'s existing finder tests for
+  those two methods passed unchanged.
+- No `SecurityConfig` change (confirmed by diff: file not touched), no Flyway migration (confirmed:
+  no new file under `db/migration`), no change to `POST /api/library/movies` or `GET /api/library`
+  request/response shapes.
+- `LibraryMovieServiceTest`'s existing `addMovie` tests (status default/validation/duplicate/TMDB
+  propagation) all still pass unchanged, confirming `updateStatus` did not disturb `parseWatchStatus`
+  or `toResponse`, which it reuses.
+
+No shared-infrastructure risk found that Test's own Phase 1 invariant tests do not already cover, so
+no additional regression tests were written this round - the existing suite already exercises every
+risk this diff introduces (same conclusion Dev reached in Phase 2 design review).
+
+### Spec Changes
+`git diff main...HEAD -- docs/specs/story-010-set-movie-watch-status.md` is empty - no change to the
+story spec on this branch. No PO question was raised during Phase 1, 2, or 3.
+
+### Gaps
+None. Every AC and invariant has at least one passing test; no failures, no skips.
+
+---
+
+## Phase 2: Dev implementation (2026-11-27)
+
+Implemented exactly per `story-010-agreed.md`, no new Dev unit tests needed - the agreed design's
+Test Coverage Confirmation already found Test's own committed suite complete at the unit level
+(mirrors story-009 precedent), so Phase 2 began straight at implementation:
+
+- `LibraryMovie`: added `setStatus(WatchStatus)`, the one new mutator the agreed design allows.
+- `LibraryMovieRepository`: added `findByIdAndUserId(Long id, Long userId)`, additive.
+- `dto/UpdateMovieStatusRequest`: new record, `@NotBlank(message = "Status is required") String status`.
+- `exception/LibraryMovieNotFoundException`: new, fixed message "This movie is not in your library.".
+- `LibraryMovieService`: added `updateStatus(Long userId, Long libraryMovieId, String statusValue)`,
+  reusing the existing private `parseWatchStatus` and `toResponse` helpers unchanged, in the order
+  the contract specifies (validate status with zero repository access on an invalid value, then
+  `findByIdAndUserId`, then mutate and save).
+- `LibraryMovieController`: added `@PatchMapping("/{id}/status")` `updateStatus`, reading the owning
+  user id only from `principal.userId()`.
+- `GlobalExceptionHandler`: added the `LibraryMovieNotFoundException` -> 404 mapping.
+- No `SecurityConfig` change, no Flyway migration, per the contract.
+
+No defective tests found - every test file read during Phase 1's conformance check compiled and
+passed against this implementation without any change to test code. No PO question needed.
+
+`mvn clean verify`: BUILD SUCCESS, 420 tests run across 67 test classes, 0 failures, 0 errors, 0
+skipped (including all of `LibraryMovieServiceTest`, `LibraryMovieTest`, `LibraryMovieRepositoryTest`,
+`LibraryMovieControllerTest`, `LibraryMovieControllerPrincipalConventionTest`,
+`UpdateMovieStatusRequestValidationTest`, `LibraryMovieNotFoundExceptionTest`, and the amended
+`LibraryEndpointsSecurityTest`).
+
+Implementation committed and PR opened against `main`.
+
+---
+
+## Phase 1: Dev design review, round 1 (2026-11-27)
+
+Agreed after round 1 - no feedback round needed. Read the story, the test plan, the API contracts,
+and ran the Test Code Conformance check against all eight test files Test committed
+(`LibraryEndpointsSecurityTest`, `LibraryMovieControllerPrincipalConventionTest`,
+`LibraryMovieControllerTest`, `LibraryMovieRepositoryTest`, `LibraryMovieServiceTest`,
+`LibraryMovieTest`, `UpdateMovieStatusRequestValidationTest`, `LibraryMovieNotFoundExceptionTest`),
+cross-checked against the current committed production code (`LibraryMovie`,
+`LibraryMovieRepository`, `LibraryMovieService`, `LibraryMovieController`, `LibraryMovieResponse`,
+`WatchStatus`, `InvalidWatchStatusException`, `GlobalExceptionHandler`) rather than the contract
+prose alone. Every constructor, method signature, endpoint, DTO field, status code, and error
+message used in the tests matches the final `story-010-api-contracts.md`. Independently reran
+`mvn test-compile` and confirmed the expected RED state matches Test's claim exactly: only the seven
+files that reference the five unimplemented symbols (`updateStatus`, `findByIdAndUserId`,
+`setStatus`, `UpdateMovieStatusRequest`, `LibraryMovieNotFoundException`) fail to compile;
+`LibraryEndpointsSecurityTest` compiles clean as claimed.
+
+One non-blocking documentation note: `story-010-test-plan.md`'s AC coverage table names a class
+`LibraryMovieEndpointsSecurityTest` that does not exist - the actual (and correctly named, per the
+story-010 log's own Phase 1 entry) file is `LibraryEndpointsSecurityTest`, the same class story-007
+already owns. This is a naming slip in the traceability table only; the committed test code itself
+is correct and matches the contracts, so it does not block agreement.
+
+No test/contract mismatches found. No acceptance-criteria ambiguity found. Agreed design committed
+to `story-010-agreed.md`; proceeding to Phase 2 implementation.
+
+---
+
+## Phase 1: Test goes first (2026-11-27)
+
+Complete on branch `feature/story-010-set-movie-watch-status`, cut from `main` after STORY-009
+merged (PR #31). Test plan (`docs/specs/design/story-010-test-plan.md`) maps every AC-1..AC-6 plus
+the cross-story invariants to named tests; API contracts (`docs/specs/design/story-010-api-contracts.md`)
+define one new write path over `library_movies` (STORY-007): `PATCH /api/library/movies/{id}/status`.
+No new table and no Flyway migration - `status` is already a `VARCHAR` column; this story only adds
+application logic to change it after insert. No `SecurityConfig` change: the route already falls
+under the existing `anyRequest().authenticated()` rule.
+
+Six design decisions recorded as Test's implementation calls rather than spec ambiguities (see the
+API contracts doc and the test plan's "Design Decisions Made Explicit"): (1) the endpoint is keyed
+by `library_movies.id` (the same id STORY-007/009 already return), not `tmdbId`; (2) a request
+against another user's item and a request against a nonexistent item both return the identical 404
+body, matching this codebase's existing cross-user-access pattern of never exposing whether an id
+belongs to someone else, and consistent with there being no 403 precedent anywhere in this API;
+(3) status is validated before the library row is looked up, mirroring
+`AccountSettingsService.updateRatingType`'s order, so an unsupported value touches the repository
+zero times even for an id the caller does not own; (4) `LibraryMovie` gains exactly one mutator,
+`setStatus(WatchStatus)` - see below for why this required revising a story-007 test; (5) the
+service method is `updateStatus(Long userId, Long libraryMovieId, String statusValue)`, mirroring
+`addMovie`'s existing parameter shape; (6) no new Flyway migration.
+
+**Cross-story invariant conflict found and resolved**: story-007's `LibraryMovieTest` asserted the
+entity exposed no `set*` method at all ("Getters only, no setters: this story sets every field once
+at construction"). That invariant predates this story's AC-1/AC-3 requirement to change `status`
+after construction, and the two cannot both hold - this is exactly the kind of cross-story
+invariant check Phase 1 calls for when a new story touches shared infrastructure. Resolved by
+revising `LibraryMovieTest.should_exposeGettersOnlyAndNoSetters` to
+`should_exposeGettersAndOnlyTheStatusMutator_when_methodsAreInspected`, which now asserts
+`setStatus` is the *only* `set*`-prefixed method on the class - preserving the original invariant's
+intent (no uncontrolled field mutation) while allowing the one mutation this story requires. No
+other entity in the codebase is affected.
+
+Seven test files touched, two new:
+- `dto/UpdateMovieStatusRequestValidationTest` (new, plain Jakarta Validator, pins `@NotBlank` on
+  `status` only - mirrors `UpdateAccountSettingsRequestValidationTest`).
+- `exception/LibraryMovieNotFoundExceptionTest` (new, mirrors `DuplicateLibraryMovieExceptionTest`,
+  pins the fixed 404 message).
+- `LibraryMovieServiceTest` (amended): `updateStatus` algorithm - all three status values store
+  correctly (AC-1), persists and reads back (AC-2), any number of transitions in any direction
+  including Watched back to Planned (AC-3), invalid value throws `InvalidWatchStatusException`
+  with zero repository access and leaves the in-memory entity's status untouched (AC-4), not-found
+  and cross-user both throw `LibraryMovieNotFoundException` with no save (AC-5, AC-6), and the
+  lookup is always keyed by both the path id and the principal's user id together.
+- `LibraryMovieControllerTest` (amended): 200 with updated body, 400 for blank status (bean
+  validation) and for an unsupported value (service exception mapping), 404 for
+  `LibraryMovieNotFoundException` mapping.
+- `LibraryMovieControllerPrincipalConventionTest` (amended): `principal.userId()` threads into
+  `updateStatus`, two different principals route to two different calls.
+- `LibraryMovieRepositoryTest` (amended): new `findByIdAndUserId` finder - empty-without-throwing
+  for both a nonexistent id and another user's id (cross-story repository invariant), finds the
+  correct row when both id and user match, and a `setStatus` + `save` round-trips through a fresh
+  `findByIdAndUserId`.
+- `LibraryEndpointsSecurityTest` (amended, not a new file - same controller class story-007 already
+  owns this file for): 401 boundary, full-stack update returning 200, the updated status visible in
+  a subsequent `GET /api/library` (AC-2's "library list from STORY-009" clause), Watched-back-to-
+  Planned end to end (AC-3), an invalid value leaving the list's status unchanged (AC-4), a second
+  user's attempt against the first user's movie returning 404 and changing nothing (AC-5), and a
+  nonexistent id returning 404 (AC-6).
+
+Expected Phase 1 RED confirmed by running `mvn test-compile`: the test module fails to compile only
+on the unimplemented `UpdateMovieStatusRequest`, `LibraryMovieNotFoundException`,
+`LibraryMovieService.updateStatus`, `LibraryMovieRepository.findByIdAndUserId`, and
+`LibraryMovie.setStatus` symbols - no other file in the module is affected, consistent with the
+story-002/005/006/007/008/009 convention. `LibraryEndpointsSecurityTest` itself compiles clean
+(it only calls `MockMvc`/`ObjectMapper`, never the new symbols directly), so its new methods will
+fail at runtime with 404 "No endpoint" instead of a compile error until Dev adds the route - still
+the correct RED state.
+
+No PO question raised this round - all six acceptance criteria read unambiguously against the
+existing STORY-007/009 contracts, and `WatchStatus`'s own javadoc already anticipated "STORY-010
+sets it on movies" before this story began.
+
+Design iteration with Dev has not started yet - this is the Phase 1 commit. Per the workflow, at
+least one Dev review round is required before implementation begins.

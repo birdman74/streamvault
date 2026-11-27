@@ -8,6 +8,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.Optional;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +23,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import com.streamvault.backend.library.dto.LibraryMovieResponse;
 import com.streamvault.backend.library.exception.DuplicateLibraryMovieException;
 import com.streamvault.backend.library.exception.InvalidWatchStatusException;
+import com.streamvault.backend.library.exception.LibraryMovieNotFoundException;
 import com.streamvault.backend.tmdb.TmdbGateway;
 import com.streamvault.backend.tmdb.dto.TmdbMovie;
 import com.streamvault.backend.tmdb.exception.TmdbTitleNotFoundException;
@@ -238,5 +241,130 @@ class LibraryMovieServiceTest {
         verify(libraryMovieRepository).save(saved.capture());
         assertThat(saved.getValue().getReleaseYear()).isNull();
         assertThat(saved.getValue().getPosterUrl()).isNull();
+    }
+
+    /*
+     * Contract lives in docs/specs/design/story-010-api-contracts.md. updateStatus and
+     * LibraryMovieNotFoundException do not exist yet; these methods are expected to fail to
+     * compile until Dev implements them.
+     */
+
+    private LibraryMovie existingMovie(Long userId, WatchStatus status) {
+        return new LibraryMovie(userId, TMDB_ID, "Inception", 2010,
+                "https://image.tmdb.org/t/p/w500/inception.jpg", status);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"PLANNED", "CURRENTLY_WATCHING", "WATCHED"})
+    void should_updateStoredStatus_when_statusIsSetTo(String status) {
+        LibraryMovie movie = existingMovie(1L, WatchStatus.PLANNED);
+        when(libraryMovieRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(movie));
+        when(libraryMovieRepository.save(any(LibraryMovie.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        LibraryMovieResponse response = libraryMovieService.updateStatus(1L, 10L, status);
+
+        assertThat(response.status()).isEqualTo(status);
+        assertThat(movie.getStatus()).isEqualTo(WatchStatus.valueOf(status));
+        verify(libraryMovieRepository).save(movie);
+    }
+
+    @Test
+    void should_persistStatusChange_when_readBackAfterUpdate() {
+        LibraryMovie movie = existingMovie(1L, WatchStatus.PLANNED);
+        when(libraryMovieRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(movie));
+        when(libraryMovieRepository.save(any(LibraryMovie.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        libraryMovieService.updateStatus(1L, 10L, "WATCHED");
+
+        when(libraryMovieRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(movie));
+        LibraryMovieResponse readBack = libraryMovieService.updateStatus(1L, 10L, "WATCHED");
+
+        assertThat(readBack.status()).isEqualTo("WATCHED");
+    }
+
+    @Test
+    void should_allowAnyNumberOfTransitionsInAnyDirection_when_statusIsChangedRepeatedly() {
+        LibraryMovie movie = existingMovie(1L, WatchStatus.PLANNED);
+        when(libraryMovieRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(movie));
+        when(libraryMovieRepository.save(any(LibraryMovie.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(libraryMovieService.updateStatus(1L, 10L, "WATCHED").status()).isEqualTo("WATCHED");
+        assertThat(libraryMovieService.updateStatus(1L, 10L, "PLANNED").status()).isEqualTo("PLANNED");
+        assertThat(libraryMovieService.updateStatus(1L, 10L, "CURRENTLY_WATCHING").status())
+                .isEqualTo("CURRENTLY_WATCHING");
+        assertThat(libraryMovieService.updateStatus(1L, 10L, "WATCHED").status()).isEqualTo("WATCHED");
+        assertThat(libraryMovieService.updateStatus(1L, 10L, "PLANNED").status()).isEqualTo("PLANNED");
+
+        verify(libraryMovieRepository, org.mockito.Mockito.times(5)).save(movie);
+    }
+
+    @Test
+    void should_throwInvalidWatchStatusException_when_updateStatusValueIsNotARecognizedValue() {
+        assertThatThrownBy(() -> libraryMovieService.updateStatus(1L, 10L, "SOON"))
+                .isInstanceOf(InvalidWatchStatusException.class);
+
+        verifyNoInteractions(libraryMovieRepository);
+    }
+
+    @Test
+    void should_throwInvalidWatchStatusException_when_updateStatusValueDiffersOnlyInCase() {
+        assertThatThrownBy(() -> libraryMovieService.updateStatus(1L, 10L, "watched"))
+                .isInstanceOf(InvalidWatchStatusException.class);
+
+        verifyNoInteractions(libraryMovieRepository);
+    }
+
+    @Test
+    void should_leaveStoredStatusUnchanged_when_updateStatusValueIsInvalid() {
+        LibraryMovie movie = existingMovie(1L, WatchStatus.PLANNED);
+
+        assertThatThrownBy(() -> libraryMovieService.updateStatus(1L, 10L, "SOON"))
+                .isInstanceOf(InvalidWatchStatusException.class);
+
+        assertThat(movie.getStatus()).isEqualTo(WatchStatus.PLANNED);
+        verify(libraryMovieRepository, never()).save(any(LibraryMovie.class));
+    }
+
+    @Test
+    void should_throwLibraryMovieNotFoundException_when_noMovieMatchesTheIdForThatUser() {
+        when(libraryMovieRepository.findByIdAndUserId(999L, 1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> libraryMovieService.updateStatus(1L, 999L, "WATCHED"))
+                .isInstanceOf(LibraryMovieNotFoundException.class);
+
+        verify(libraryMovieRepository, never()).save(any(LibraryMovie.class));
+    }
+
+    @Test
+    void should_throwLibraryMovieNotFoundException_when_theItemBelongsToAnotherUser() {
+        when(libraryMovieRepository.findByIdAndUserId(10L, 2L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> libraryMovieService.updateStatus(2L, 10L, "WATCHED"))
+                .isInstanceOf(LibraryMovieNotFoundException.class);
+    }
+
+    @Test
+    void should_notSaveAnything_when_theItemBelongsToAnotherUser() {
+        when(libraryMovieRepository.findByIdAndUserId(10L, 2L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> libraryMovieService.updateStatus(2L, 10L, "WATCHED"))
+                .isInstanceOf(LibraryMovieNotFoundException.class);
+
+        verify(libraryMovieRepository, never()).save(any(LibraryMovie.class));
+    }
+
+    @Test
+    void should_lookUpByBothIdAndUserId_when_updatingStatus() {
+        LibraryMovie movie = existingMovie(42L, WatchStatus.PLANNED);
+        when(libraryMovieRepository.findByIdAndUserId(10L, 42L)).thenReturn(Optional.of(movie));
+        when(libraryMovieRepository.save(any(LibraryMovie.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        libraryMovieService.updateStatus(42L, 10L, "WATCHED");
+
+        verify(libraryMovieRepository).findByIdAndUserId(10L, 42L);
     }
 }

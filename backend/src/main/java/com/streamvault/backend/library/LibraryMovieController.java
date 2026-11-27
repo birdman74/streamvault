@@ -3,6 +3,8 @@ package com.streamvault.backend.library;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.streamvault.backend.auth.AuthenticatedUser;
 import com.streamvault.backend.library.dto.AddMovieRequest;
 import com.streamvault.backend.library.dto.LibraryMovieResponse;
+import com.streamvault.backend.library.dto.UpdateMovieStatusRequest;
 
 import jakarta.validation.Valid;
 
@@ -39,5 +42,14 @@ public class LibraryMovieController {
         LibraryMovieResponse body =
                 libraryMovieService.addMovie(principal.userId(), request.tmdbId(), request.status());
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<LibraryMovieResponse> updateStatus(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateMovieStatusRequest request) {
+        return ResponseEntity.ok(
+                libraryMovieService.updateStatus(principal.userId(), id, request.status()));
     }
 }

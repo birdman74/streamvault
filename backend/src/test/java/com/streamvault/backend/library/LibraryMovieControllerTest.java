@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -24,6 +25,7 @@ import com.streamvault.backend.config.SecurityConfig;
 import com.streamvault.backend.library.dto.LibraryMovieResponse;
 import com.streamvault.backend.library.exception.DuplicateLibraryMovieException;
 import com.streamvault.backend.library.exception.InvalidWatchStatusException;
+import com.streamvault.backend.library.exception.LibraryMovieNotFoundException;
 import com.streamvault.backend.testsupport.WithMockAuthenticatedUser;
 import com.streamvault.backend.tmdb.exception.TmdbTitleNotFoundException;
 import com.streamvault.backend.tmdb.exception.TmdbUnavailableException;
@@ -199,5 +201,72 @@ class LibraryMovieControllerTest {
                         .content("{\"tmdbId\":222}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Working"));
+    }
+
+    /*
+     * Contract lives in docs/specs/design/story-010-api-contracts.md. updateStatus,
+     * UpdateMovieStatusRequest, and LibraryMovieNotFoundException do not exist yet; these methods
+     * are expected to fail to compile until Dev implements them.
+     */
+
+    private static final String NOT_FOUND_MESSAGE = "This movie is not in your library.";
+
+    @Test
+    void should_return200WithTheUpdatedEntry_when_statusIsChanged() throws Exception {
+        when(libraryMovieService.updateStatus(eq(7L), eq(1L), eq("WATCHED")))
+                .thenReturn(inceptionResponse("WATCHED"));
+
+        mockMvc.perform(patch("/api/library/movies/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"WATCHED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.status").value("WATCHED"));
+    }
+
+    @Test
+    void should_threadThePathIdAndPrincipalUserIdIntoTheService_when_updatingStatus() throws Exception {
+        when(libraryMovieService.updateStatus(eq(7L), eq(5L), eq("PLANNED")))
+                .thenReturn(inceptionResponse("PLANNED"));
+
+        mockMvc.perform(patch("/api/library/movies/5/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"PLANNED\"}"))
+                .andExpect(status().isOk());
+
+        verify(libraryMovieService).updateStatus(eq(7L), eq(5L), eq("PLANNED"));
+    }
+
+    @Test
+    void should_return400_when_updateStatusBodyIsBlank() throws Exception {
+        mockMvc.perform(patch("/api/library/movies/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fields.status").value("Status is required"));
+    }
+
+    @Test
+    void should_return400WithClearMessage_when_updateStatusIsUnsupported() throws Exception {
+        when(libraryMovieService.updateStatus(eq(7L), eq(1L), eq("SOON")))
+                .thenThrow(new InvalidWatchStatusException("SOON"));
+
+        mockMvc.perform(patch("/api/library/movies/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"SOON\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(INVALID_STATUS_MESSAGE));
+    }
+
+    @Test
+    void should_return404WithClearMessage_when_updateStatusTargetsAMovieNotInTheLibrary() throws Exception {
+        when(libraryMovieService.updateStatus(eq(7L), eq(999L), eq("WATCHED")))
+                .thenThrow(new LibraryMovieNotFoundException());
+
+        mockMvc.perform(patch("/api/library/movies/999/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"WATCHED\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value(NOT_FOUND_MESSAGE));
     }
 }

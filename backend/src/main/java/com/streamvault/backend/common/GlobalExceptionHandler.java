@@ -19,6 +19,7 @@ import com.streamvault.backend.auth.exception.InvalidCredentialsException;
 import com.streamvault.backend.library.exception.DuplicateLibraryMovieException;
 import com.streamvault.backend.library.exception.DuplicateLibrarySeriesException;
 import com.streamvault.backend.library.exception.InvalidWatchStatusException;
+import com.streamvault.backend.library.exception.LibraryMovieNotFoundException;
 import com.streamvault.backend.settings.exception.InvalidRatingTypeException;
 import com.streamvault.backend.tmdb.exception.TmdbSeriesNotFoundException;
 import com.streamvault.backend.tmdb.exception.TmdbTitleNotFoundException;
@@ -82,6 +83,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DuplicateLibraryMovieException.class)
     public ResponseEntity<Map<String, String>> handleDuplicateLibraryMovie(DuplicateLibraryMovieException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(LibraryMovieNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleLibraryMovieNotFound(LibraryMovieNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Map.of("error", ex.getMessage()));
     }
 

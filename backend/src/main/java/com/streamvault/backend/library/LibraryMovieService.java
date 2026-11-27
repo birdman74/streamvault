@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import com.streamvault.backend.library.dto.LibraryMovieResponse;
 import com.streamvault.backend.library.exception.DuplicateLibraryMovieException;
 import com.streamvault.backend.library.exception.InvalidWatchStatusException;
+import com.streamvault.backend.library.exception.LibraryMovieNotFoundException;
 import com.streamvault.backend.tmdb.TmdbGateway;
 import com.streamvault.backend.tmdb.dto.TmdbMovie;
 
@@ -59,6 +60,18 @@ public class LibraryMovieService {
         } catch (DataIntegrityViolationException ex) {
             throw new DuplicateLibraryMovieException();
         }
+
+        return toResponse(saved);
+    }
+
+    public LibraryMovieResponse updateStatus(Long userId, Long libraryMovieId, String statusValue) {
+        WatchStatus status = parseWatchStatus(statusValue);
+
+        LibraryMovie movie = libraryMovieRepository.findByIdAndUserId(libraryMovieId, userId)
+                .orElseThrow(LibraryMovieNotFoundException::new);
+
+        movie.setStatus(status);
+        LibraryMovie saved = libraryMovieRepository.save(movie);
 
         return toResponse(saved);
     }

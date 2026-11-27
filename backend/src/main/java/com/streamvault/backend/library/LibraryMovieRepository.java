@@ -17,4 +17,6 @@ public interface LibraryMovieRepository extends JpaRepository<LibraryMovie, Long
     Optional<LibraryMovie> findByUserIdAndTmdbId(Long userId, long tmdbId);
 
     List<LibraryMovie> findByUserId(Long userId);
+
+    Optional<LibraryMovie> findByIdAndUserId(Long id, Long userId);
 }

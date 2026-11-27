@@ -9,6 +9,38 @@ Branch: `feature/story-010-set-movie-watch-status`
 
 ---
 
+## Phase 2: Dev implementation (2026-11-27)
+
+Implemented exactly per `story-010-agreed.md`, no new Dev unit tests needed - the agreed design's
+Test Coverage Confirmation already found Test's own committed suite complete at the unit level
+(mirrors story-009 precedent), so Phase 2 began straight at implementation:
+
+- `LibraryMovie`: added `setStatus(WatchStatus)`, the one new mutator the agreed design allows.
+- `LibraryMovieRepository`: added `findByIdAndUserId(Long id, Long userId)`, additive.
+- `dto/UpdateMovieStatusRequest`: new record, `@NotBlank(message = "Status is required") String status`.
+- `exception/LibraryMovieNotFoundException`: new, fixed message "This movie is not in your library.".
+- `LibraryMovieService`: added `updateStatus(Long userId, Long libraryMovieId, String statusValue)`,
+  reusing the existing private `parseWatchStatus` and `toResponse` helpers unchanged, in the order
+  the contract specifies (validate status with zero repository access on an invalid value, then
+  `findByIdAndUserId`, then mutate and save).
+- `LibraryMovieController`: added `@PatchMapping("/{id}/status")` `updateStatus`, reading the owning
+  user id only from `principal.userId()`.
+- `GlobalExceptionHandler`: added the `LibraryMovieNotFoundException` -> 404 mapping.
+- No `SecurityConfig` change, no Flyway migration, per the contract.
+
+No defective tests found - every test file read during Phase 1's conformance check compiled and
+passed against this implementation without any change to test code. No PO question needed.
+
+`mvn clean verify`: BUILD SUCCESS, 420 tests run across 67 test classes, 0 failures, 0 errors, 0
+skipped (including all of `LibraryMovieServiceTest`, `LibraryMovieTest`, `LibraryMovieRepositoryTest`,
+`LibraryMovieControllerTest`, `LibraryMovieControllerPrincipalConventionTest`,
+`UpdateMovieStatusRequestValidationTest`, `LibraryMovieNotFoundExceptionTest`, and the amended
+`LibraryEndpointsSecurityTest`).
+
+Implementation committed and PR opened against `main`.
+
+---
+
 ## Phase 1: Dev design review, round 1 (2026-11-27)
 
 Agreed after round 1 - no feedback round needed. Read the story, the test plan, the API contracts,

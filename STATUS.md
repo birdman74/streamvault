@@ -29,7 +29,7 @@ To compute current health, use `Last Updated` date and `Blocked Items` section b
 Application Development - User Authentication epic complete and merged (STORY-001, STORY-002).
 Autonomous Agentic Workflow epic complete (STORY-003, STORY-004). Personal Streaming Library epic
 defined by PO: STORY-005 through STORY-019 spec'ed and queued for Test and Dev. STORY-009 merged.
-STORY-010 design agreed round 1; Dev beginning Phase 2 implementation.
+STORY-010 implemented, PR open, awaiting Test verification.
 
 ---
 
@@ -109,7 +109,7 @@ Spec: `docs/specs/epic-personal-library.md` - awaiting Brian review before the q
 - [x] STORY-007: Add Movie from TMDB to Library (`docs/specs/story-007-add-movie-from-tmdb.md`) - prereq STORY-006 - Completed - Full trace: `docs/specs/status/story-007-log.md`
 - [x] STORY-008: Add TV Series from TMDB to Library (`docs/specs/story-008-add-series-from-tmdb.md`) - prereq STORY-006 - Completed - Full trace: `docs/specs/status/story-008-log.md`
 - [x] STORY-009: View and Filter My Library (`docs/specs/story-009-view-filter-library.md`) - prereq STORY-007, STORY-008 - Completed - Full trace: `docs/specs/status/story-009-log.md`
-- [ ] STORY-010: Set Movie Watch Status (`docs/specs/story-010-set-movie-watch-status.md`) - prereq STORY-007 - Design agreed round 1, Dev implementing - Full trace: `docs/specs/status/story-010-log.md`
+- [ ] STORY-010: Set Movie Watch Status (`docs/specs/story-010-set-movie-watch-status.md`) - prereq STORY-007 - Implemented, PR open, awaiting Test - Full trace: `docs/specs/status/story-010-log.md`
 - [ ] STORY-011: Remove Item from Library (`docs/specs/story-011-remove-library-item.md`) - prereq STORY-007, STORY-008
 - [ ] STORY-012: Series Progress by Episode with Season and Series Roll-Up (`docs/specs/story-012-series-episode-status-rollup.md`) - prereq STORY-008
 - [ ] STORY-013: Set and Clear Watch Dates Across Series Levels (`docs/specs/story-013-watch-dates.md`) - prereq STORY-010, STORY-012

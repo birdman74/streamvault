@@ -9,6 +9,81 @@ Branch: `feature/story-010-set-movie-watch-status`
 
 ---
 
+## Phase 3: Test PR verification (2026-11-27)
+
+**Verdict: APPROVED** (PR #32)
+
+Pulled `feature/story-010-set-movie-watch-status` (already up to date with origin), ran
+`mvn clean verify`: BUILD SUCCESS, 420 tests run across the full suite, 0 failures, 0 errors, 0
+skipped. This matches Dev's Phase 2 claim exactly - no drift between Dev's local run and this
+re-verification.
+
+### Acceptance Criteria Coverage
+Checked every AC-1..AC-6 test named in `story-010-test-plan.md` against the actual committed test
+files (not just the table) and confirmed each one exists, compiles, and passed in the run above:
+- AC-1: `LibraryMovieServiceTest.should_updateStoredStatus_when_statusIsSetTo` (all three values),
+  `LibraryMovieControllerTest.should_return200WithTheUpdatedEntry_when_statusIsChanged`,
+  `LibraryEndpointsSecurityTest.should_updateStatusEndToEnd_when_aValidStatusIsSubmitted`
+- AC-2: `LibraryMovieServiceTest.should_persistStatusChange_when_readBackAfterUpdate`,
+  `LibraryMovieRepositoryTest.should_roundTripAnUpdatedStatus_when_savedAfterSetStatus`,
+  `LibraryEndpointsSecurityTest.should_reflectTheNewStatus_when_libraryListIsFetchedAfterAnUpdate`
+- AC-3: `LibraryMovieServiceTest.should_allowAnyNumberOfTransitionsInAnyDirection_when_statusIsChangedRepeatedly`,
+  `LibraryEndpointsSecurityTest.should_allowWatchedBackToPlanned_when_statusIsChangedTwiceEndToEnd`
+- AC-4: `LibraryMovieServiceTest.should_throwInvalidWatchStatusException_when_updateStatusValueIsNotARecognizedValue`
+  / `...ValueDiffersOnlyInCase` / `should_leaveStoredStatusUnchanged_when_updateStatusValueIsInvalid`,
+  `LibraryMovieControllerTest.should_return400WithClearMessage_when_updateStatusIsUnsupported`,
+  `UpdateMovieStatusRequestValidationTest.should_rejectRequest_when_statusIsBlank` / `...IsNull`,
+  `LibraryEndpointsSecurityTest.should_leaveStatusUnchanged_when_anInvalidStatusValueIsSubmittedEndToEnd`
+- AC-5: `LibraryMovieRepositoryTest.should_notFindAnotherUsersMovie_when_updatingByIdAndUserId` (named
+  `should_returnEmptyOptional_when_findByIdAndUserIdMatchesAnIdButADifferentUser` in the committed
+  file - same naming slip as the test-plan table, not a coverage gap),
+  `LibraryMovieServiceTest.should_throwLibraryMovieNotFoundException_when_theItemBelongsToAnotherUser`
+  / `should_notSaveAnything_when_theItemBelongsToAnotherUser`,
+  `LibraryEndpointsSecurityTest.should_return404AndChangeNothing_when_aUserTriesToUpdateAnotherUsersMovie`
+- AC-6: `LibraryMovieServiceTest.should_throwLibraryMovieNotFoundException_when_noMovieMatchesTheIdForThatUser`,
+  `LibraryMovieControllerTest.should_return404WithClearMessage_when_updateStatusTargetsAMovieNotInTheLibrary`,
+  `LibraryMovieNotFoundExceptionTest.should_carryTheFixedUserFacingMessage_when_constructed`,
+  `LibraryEndpointsSecurityTest.should_return404_when_updatingStatusOfANonexistentLibraryMovie`
+
+All four cross-story invariants from the test plan also confirmed passing: repository
+empty-without-throwing (`LibraryMovieRepositoryTest`), entity's single-mutator invariant
+(`LibraryMovieTest.should_exposeGettersAndOnlyTheStatusMutator_when_methodsAreInspected`), the
+`authenticated()` boundary (`LibraryEndpointsSecurityTest.should_return401_when_updateStatusIsCalledWithoutAuthentication`),
+and principal-sourced user id threading (`LibraryMovieControllerPrincipalConventionTest`, two
+methods).
+
+### Regression Analysis
+Diffed `main...HEAD`: implementation touches `GlobalExceptionHandler`, `LibraryMovie`,
+`LibraryMovieController`, `LibraryMovieRepository`, `LibraryMovieService` (all shared), plus two new
+files (`UpdateMovieStatusRequest`, `LibraryMovieNotFoundException`). Every change is additive:
+- `GlobalExceptionHandler`: one new `@ExceptionHandler` method added; no existing handler body
+  changed. Every other exception-mapping test (auth, settings, tmdb) still green in the same run.
+- `LibraryMovie`: one new `setStatus` mutator added; no existing field, constructor, or getter
+  touched. `LibraryMovieTest`'s revised invariant test (agreed in Phase 1/2) pins this as the *only*
+  mutator, so a future story adding an uncontrolled setter would fail this test first.
+- `LibraryMovieRepository`: one new finder method (`findByIdAndUserId`), no change to
+  `findByUserIdAndTmdbId` or `findByUserId`. `LibraryMovieRepositoryTest`'s existing finder tests for
+  those two methods passed unchanged.
+- No `SecurityConfig` change (confirmed by diff: file not touched), no Flyway migration (confirmed:
+  no new file under `db/migration`), no change to `POST /api/library/movies` or `GET /api/library`
+  request/response shapes.
+- `LibraryMovieServiceTest`'s existing `addMovie` tests (status default/validation/duplicate/TMDB
+  propagation) all still pass unchanged, confirming `updateStatus` did not disturb `parseWatchStatus`
+  or `toResponse`, which it reuses.
+
+No shared-infrastructure risk found that Test's own Phase 1 invariant tests do not already cover, so
+no additional regression tests were written this round - the existing suite already exercises every
+risk this diff introduces (same conclusion Dev reached in Phase 2 design review).
+
+### Spec Changes
+`git diff main...HEAD -- docs/specs/story-010-set-movie-watch-status.md` is empty - no change to the
+story spec on this branch. No PO question was raised during Phase 1, 2, or 3.
+
+### Gaps
+None. Every AC and invariant has at least one passing test; no failures, no skips.
+
+---
+
 ## Phase 2: Dev implementation (2026-11-27)
 
 Implemented exactly per `story-010-agreed.md`, no new Dev unit tests needed - the agreed design's
